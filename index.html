@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態1助理 - Web 介面 (錄音除錯版)</title>
+    <title>AI 多模態助理 - Web 介面 (錄音除錯版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -130,6 +130,15 @@
         let audioChunks = []; let capturedImageBlobs = []; let captureInterval;
         let ignoreClicksUntil = 0;
 
+        // -----------------------------------------------------
+        // 核心狀態與參數
+        // -----------------------------------------------------
+        const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
+        
+        // 🟢 新增這行：網頁載入時產生一次 ID，之後一直用它
+        const currentSessionId = Date.now().toString(); 
+
+        let currentState = STATE.IDLE;
         // 參數設定
         const LOCK_SECONDS = 3; // 強制錄音最少 3 秒
         const SILENCE_TIMEOUT_SECONDS = 3; 
@@ -266,7 +275,14 @@
             downloadLink.className = 'debug-link';
             document.getElementById('debug-link-container').appendChild(downloadLink);
             appendLog(`🔊 已生成錄音檔連結，請點擊下方藍色按鈕下載測試。`);
-
+            
+            const turnData = {
+                session_id: currentSessionId,  // 🟢 修改：使用固定的全域變數
+                history: [], 
+                current_personality: null,
+                wake_word: WAKE_WORD 
+            };
+            formData.append('turn_data', JSON.stringify(turnData));
             // 暫時降低門檻以便測試
             if (audioBlob.size < 1000) {
                 appendLog('⚠️ 錄音極短 (Size<1KB)，可能無聲音。', 'warning');
