@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面 (好了吧)</title>
+    <title>AI 多模態助理 - Web 介面 (最終整合版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -62,7 +62,7 @@
 <body>
     <div class="container">
         <div class="left-panel">
-            <h1>💬 AI 多模態助理 (記憶增強版)</h1>
+            <h1>💬 AI 多模態助理 (最終整合版)</h1>
             
             <div class="input-group">
                 <label for="tunnel-url">🚨 Cloudflare Tunnel HTTPS 網址 (必填):</label>
@@ -149,8 +149,8 @@
         const SILENCE_TIMEOUT_SECONDS = 3; 
         const MAX_RECORD_SECONDS = 15; 
         
-        // 🔴 靈敏度設定：設為 2 (超靈敏)
-        const VOICE_THRESHOLD = 2;    
+        // 🔴 靈敏度設定：設為 4 (比呼吸聲2大，比人聲10小)
+        const VOICE_THRESHOLD = 4;    
         
         const FRAME_RATE = 0.5; 
         const WAKE_WORD = "嗨小白"; 
@@ -288,7 +288,7 @@
             downloadLink.className = 'debug-link';
             document.getElementById('debug-link-container').appendChild(downloadLink);
 
-            // 門檻檢查 (放寬到 1KB)
+            // 門檻檢查
             if (audioBlob.size < 1000) {
                 appendLog('⚠️ 錄音極短 (Size<1KB)，取消上傳。', 'warning');
                 updateState(STATE.IDLE);
@@ -320,10 +320,6 @@
                 updateState(STATE.IDLE);
             }
         }
-        
-        // ------------------------------------------------------------------
-        // 裝置選擇與 VAD
-        // ------------------------------------------------------------------
         
         async function getAudioDevices() {
             const select = document.getElementById('mic-select');
@@ -455,9 +451,9 @@
                 for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
                 const now = audioContext.currentTime;
 
-                // 音量數值顯示與狀態更新
+                // 🔴 顯示數值到網頁上
                 const volDisplay = document.getElementById('vol-display');
-                if (debugCounter++ % 10 === 0) { // 稍微降低更新頻率
+                if (debugCounter++ % 10 === 0) { 
                     volDisplay.textContent = `(Vol: ${max})`;
                     if (max > VOICE_THRESHOLD) volDisplay.classList.add('active');
                     else volDisplay.classList.remove('active');
@@ -530,9 +526,17 @@
              document.getElementById('personality-mode-tag').textContent = result.new_manual_personality ? '手動' : '自動';
              document.getElementById('assistant-emoji').textContent = mapE[result.personality]||'❓';
              
+             // 🟢 新增：更新情緒趨勢標籤顏色與文字
              const trendTag = document.getElementById('emotion-trend-tag');
              trendTag.textContent = getTrendMessage(result.emotion_trend);
-             trendTag.className = `status-tag ${result.emotion_trend || 'stable'}`;
+             
+             let cssClass = 'stable';
+             if (result.emotion_trend === 'worsening' || result.emotion_trend === 'persistent_worsening') {
+                 cssClass = 'worsening'; 
+             } else if (result.emotion_trend === 'improving' || result.emotion_trend === 'persistent_improving') {
+                 cssClass = 'improving'; 
+             }
+             trendTag.className = `status-tag ${cssClass}`;
 
              if(result.emotion_results?.text) {
                  const e = result.emotion_results.text;
@@ -552,22 +556,19 @@
              }
         }
 
+        function getTrendMessage(trend) { 
+            if (trend === 'worsening') return '惡化中 🔻';
+            if (trend === 'improving') return '改善中 ⬆️';
+            if (trend === 'persistent_worsening') return '持續惡化 🌧️';
+            if (trend === 'persistent_improving') return '持續改善 🌟';
+            return '穩定 (Stable) ⏸️';
+        }
+
         function appendLog(msg, type='info') {
             const div = document.createElement('div');
             div.className = 'log-item';
             div.innerHTML = msg;
             document.getElementById('log-display').prepend(div);
-        }
-
-function getTrendMessage(trend) { 
-            if (trend === 'worsening') return '惡化中 🔻';
-            if (trend === 'improving') return '改善中 ⬆️';
-            
-            // 🟢 新增這兩行
-            if (trend === 'persistent_worsening') return '持續惡化 🌧️';
-            if (trend === 'persistent_improving') return '持續改善 🌟';
-            
-            return '穩定 (Stable) ⏸️';
         }
 
         document.addEventListener('DOMContentLoaded', () => {
