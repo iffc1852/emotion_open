@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 多模態助理 - Web 介面</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
+        .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
+        .left-panel { flex: 2; padding: 20px; border-right: 1px solid #eee; background-color: #ffffff; }
+        .right-panel { flex: 1; padding: 20px; text-align: center; background-color: #fafafa; border-radius: 0 10px 10px 0; }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; }
+        h2 { color: #007bff; margin-top: 20px; }
+        .log-section { margin-top: 15px; padding: 15px; background-color: #e9ecef; border-radius: 5px; max-height: 250px; overflow-y: auto; font-size: 0.9em;}
+        .log-item { margin-bottom: 8px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; }
+        .emotion-box { padding: 15px; border: 1px solid #ced4da; border-radius: 8px; margin-bottom: 15px; }
+        .emotion-score { font-weight: bold; color: #28a745; margin-left: 10px; }
+        .main-status { font-size: 2em; color: #ffc107; margin-bottom: 15px; }
+        .current-personality { font-size: 1.5em; font-weight: bold; color: #6f42c1; }
+        .emoji-display { font-size: 8em; line-height: 1; margin-top: 50px; }
+        
+        /* 錄音控制 */
+        .record-control { text-align: center; margin-bottom: 20px; padding: 10px; border: 2px dashed #007bff; border-radius: 10px; }
+        #record-button { padding: 15px 30px; font-size: 1.2em; background-color: #dc3545; color: white; border: none; border-radius: 50px; cursor: pointer; transition: background-color 0.3s, transform 0.1s; }
+        #record-button:hover { background-color: #c82333; }
+        #record-button:active { transform: scale(0.98); }
+        #record-button.recording { background-color: #28a745; }
+        
+        /* 攝影機區 */
+        #camera-preview { width: 100%; height: 200px; background-color: #333; margin-top: 10px; border-radius: 5px; overflow: hidden; }
+        #camera-preview video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* 狀態標籤樣式 */
+        .status-tag { display: inline-block; padding: 5px 10px; border-radius: 15px; font-weight: bold; margin: 5px 0; font-size: 0.9em; }
+        .status-tag.auto { background-color: #e6f7ff; color: #007bff; }
+        .status-tag.manual { background-color: #fff0e6; color: #ff6600; }
+        .status-tag.worsening { background-color: #ffe6e6; color: #dc3545; }
+        .status-tag.improving { background-color: #e6ffe6; color: #28a745; }
+        .hidden { display: none; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <h1>💬 AI 多模態助理 (Web 介面)</h1>
+            
+            <div class="record-control">
+                <button id="record-button" onclick="toggleRecording()">
+                    <span id="record-text">點擊開始錄音 (喚醒詞後開始)</span>
+                </button>
+                <p id="record-status">狀態: 閒置中...</p>
+                <div id="camera-preview">
+                    <video id="video-stream" autoplay muted></video>
+                </div>
+            </div>
+
+            <h2>核心狀態</h2>
+            <div class="emotion-box">
+                <p><strong>當前人格:</strong> <span id="personality-display" class="current-personality">等待中...</span></p>
+                <p><strong>人格模式:</strong> <span id="personality-mode-tag" class="status-tag auto">自動 (Auto)</span></p>
+                <p><strong>記憶趨勢:</strong> <span id="emotion-trend-tag" class="status-tag improving">穩定 (Stable)</span></p>
+            </div>
+
+            <h2>🔬 多模態情緒分析</h2>
+            <div class="emotion-box">
+                <p><strong>📝 文字情緒:</strong> <span id="text-emotion">--</span> (信心度: <span id="text-score" class="emotion-score">0.00%</span>)</p>
+                <p><strong>🎤 語音情緒:</strong> <span id="audio-emotion">--</span> (信心度: <span id="audio-score" class="emotion-score">0.00%</span>)</p>
+                <p><strong>🎭 臉部情緒:</strong> <span id="facial-emotion">--</span> (信心度: <span id="facial-score" class="emotion-score">0.00%</span>, 幀數: <span id="facial-frames">0/0</span>)</p>
+            </div>
+
+            <h2>🗣️ 最新對話</h2>
+            <div class="emotion-box">
+                <p><strong>使用者:</strong> <span id="user-text">...</span></p>
+                <p><strong>助理回應:</strong> <span id="assistant-reply">...</span></p>
+                <audio id="tts-audio" controls class="hidden"></audio>
+            </div>
+
+        </div>
+
+        <div class="right-panel">
+            <h1>🎭 助理表情</h1>
+            <div id="status-message" class="main-status">等待錄音中...</div>
+            <div id="assistant-emoji" class="emoji-display">
+                🤔
+            </div>
+            
+            <h2>📜 執行 Log</h2>
+            <div id="log-display" class="log-section">
+                <div class="log-item">ℹ️ 網頁初始化完成，請求麥克風/鏡頭權限中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 設定您的 API 端點 (如果使用 Cloudflare Tunnel，這裡可能是公網 URL 或相對路徑)
+        // 假設 Flask Server 在同一台主機的 8000 port
+        const BASE_URL = "http://localhost:8000"; 
+        const API_PROCESS_ENDPOINT = BASE_URL + "/api/v1/process"; 
+        const API_DOWNLOAD_ENDPOINT = BASE_URL + "/api/v1/audio-download";
+
+        // 全域狀態
+        let mediaRecorder;
+        let audioChunks = [];
+        let cameraStream;
+        let videoTrack;
+        let isRecording = false;
+        let manualPersonality = null;
+        let conversationHistory = [];
+        const FRAME_RATE = 0.5; // 0.5 FPS
+        let captureInterval;
+        let capturedImageBlobs = [];
+        let sessionId = Date.now().toString();
+
+        // ------------------------------------------------------------------
+        // 核心功能：錄音、拍照、上傳
+        // ------------------------------------------------------------------
+
+        // 1. 請求麥克風和鏡頭權限
+        async function initMediaDevices() {
+            try {
+                // 麥克風權限 (音訊)
+                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                
+                // 鏡頭權限 (影片)
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                const videoElement = document.getElementById('video-stream');
+                videoElement.srcObject = cameraStream;
+                videoTrack = cameraStream.getVideoTracks()[0];
+                
+                // 初始化 MediaRecorder
+                mediaRecorder = new MediaRecorder(audioStream);
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                mediaRecorder.onstop = uploadData;
+                
+                document.getElementById('record-button').disabled = false;
+                appendLog(`✅ 麥克風與攝影機權限獲取成功！`, 'info');
+
+            } catch (err) {
+                appendLog(`❌ 媒體權限錯誤: ${err.name} - ${err.message}`, 'error');
+                document.getElementById('record-button').disabled = true;
+            }
+        }
+        
+        // 2. 錄音狀態切換
+        function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            if (!mediaRecorder || !videoTrack) {
+                appendLog('⚠️ 錄音或鏡頭未準備好。請先授權。', 'error');
+                return;
+            }
+            
+            audioChunks = [];
+            capturedImageBlobs = [];
+            
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // 啟動拍照 (0.5 FPS)
+            captureInterval = setInterval(captureImage, 1000 / FRAME_RATE); 
+            
+            document.getElementById('record-button').classList.add('recording');
+            document.getElementById('record-text').textContent = '正在錄音中... 點擊結束';
+            document.getElementById('record-status').textContent = '狀態: 錄音中 (同步拍照 0.5FPS)...';
+            document.getElementById('status-message').textContent = '請說話...';
+            appendLog(`🎙️ 開始錄音與拍照 (0.5FPS)...`);
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+
+            clearInterval(captureInterval); // 停止拍照
+            mediaRecorder.stop();
+            isRecording = false;
+
+            document.getElementById('record-button').classList.remove('recording');
+            document.getElementById('record-text').textContent = '處理中... 請稍候';
+            document.getElementById('record-status').textContent = '狀態: 錄音結束，等待上傳運算...';
+            document.getElementById('status-message').textContent = 'AI 運算中...';
+            appendLog(`🛑 錄音與拍照結束。開始上傳 ${capturedImageBlobs.length} 張圖片...`);
+        }
+        
+        // 3. 拍照功能 (0.5 FPS)
+        function captureImage() {
+            if (!videoTrack) return;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = videoTrack.getSettings().width || 640;
+            canvas.height = videoTrack.getSettings().height || 480;
+            const context = canvas.getContext('2d');
+            
+            const videoElement = document.getElementById('video-stream');
+            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            
+            // 將 Canvas 內容轉為 Blob
+            canvas.toBlob(blob => {
+                if (blob) {
+                    capturedImageBlobs.push(blob);
+                    appendLog(`   📸 擷取第 ${capturedImageBlobs.length} 幀圖片...`);
+                }
+            }, 'image/jpeg', 0.8); // 80% 品質 JPEG
+        }
+        
+        // 4. 打包與上傳數據
+        async function uploadData() {
+            // 處理音訊塊為 Blob (這裡假設瀏覽器產生的是 WAV 或相容格式，但 WebM 更常見)
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); 
+            const formData = new FormData();
+            
+            // 1. 音訊檔案
+            formData.append('audio_file', audioBlob, `user_audio_${sessionId}.wav`);
+            
+            // 2. 圖像檔案
+            capturedImageBlobs.forEach((blob, index) => {
+                formData.append(`image_${index}`, blob, `frame_${sessionId}_${index}.jpg`);
+            });
+            
+            // 3. 對話數據 (JSON)
+            const turnData = {
+                session_id: sessionId,
+                history: conversationHistory,
+                current_personality: manualPersonality,
+                wake_word: "嗨小白" // 假設喚醒詞
+            };
+            formData.append('turn_data', JSON.stringify(turnData));
+            
+            appendLog(`📦 打包完成，音訊大小: ${(audioBlob.size / 1024).toFixed(2)} KB，圖片數: ${capturedImageBlobs.length}`);
+            
+            try {
+                // 呼叫後端 API
+                const response = await fetch(API_PROCESS_ENDPOINT, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP 錯誤! Status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                handleAPIReply(result);
+
+            } catch (error) {
+                appendLog(`❌ API 錯誤: ${error.message}。請確認 Flask 伺服器已啟動並可連線。`, 'error');
+                document.getElementById('status-message').textContent = '連線錯誤！';
+                document.getElementById('assistant-emoji').textContent = '😵';
+                resetRecordingState();
+            }
+        }
+        
+        // ------------------------------------------------------------------
+        // 處理 API 回傳並更新 UI/播放音訊
+        // ------------------------------------------------------------------
+
+        async function handleAPIReply(result) {
+            appendLog(`✅ API 回傳成功！開始解析數據...`);
+
+            if (result.is_wake_detected === false) {
+                appendLog(`⚠️ 未偵測到喚醒詞，回到待命狀態。`, 'warning');
+                document.getElementById('user-text').textContent = `[喚醒失敗] ${result.user_text}`;
+                document.getElementById('assistant-reply').textContent = result.reply;
+                resetRecordingState();
+                return;
+            }
+
+            // 更新狀態
+            conversationHistory = result.updated_history || conversationHistory;
+            manualPersonality = result.new_manual_personality;
+            
+            const personalityName = getPersonalityName(result.personality);
+            const isManual = manualPersonality !== null;
+            
+            document.getElementById('user-text').textContent = result.user_text;
+            document.getElementById('assistant-reply').textContent = result.reply;
+
+            // 處理 Log 顯示
+            appendLog(`📝 Whisper STT: "${result.user_text}"`);
+            appendLog(`🔍 選定【${personalityName}】人格，模式: ${isManual ? '手動' : '自動'}`);
+            
+            // 情緒 Log
+            const textEmo = result.emotion_results?.text;
+            const audioEmo = result.emotion_results?.audio;
+            const facialEmo = result.emotion_results?.facial;
+            if (textEmo || audioEmo || facialEmo) {
+                 appendLog(`📊 情緒融合結果: 文字:${getEmotionZh(textEmo?.emotion)}, 語音:${getEmotionZh(audioEmo?.emotion)}, 臉部:${getEmotionZh(facialEmo?.emotion)}`);
+            }
+            
+            // 更新 UI 資訊面板
+            updateUIPanels(result);
+            
+            // 下載並播放 TTS 音訊
+            await playTTSAudio(result.tts_audio_file);
+
+            resetRecordingState();
+            appendLog(`\n--- 對話輪結束 ---`);
+        }
+
+        async function playTTSAudio(filename) {
+            if (!filename) {
+                appendLog('❌ 無 TTS 音訊檔名回傳。', 'error');
+                return;
+            }
+            
+            const audioPath = `${API_DOWNLOAD_ENDPOINT}?filename=${filename}`;
+            const audio = document.getElementById('tts-audio');
+            
+            appendLog(`🎶 正在下載並播放 TTS 檔案: ${filename}`);
+            document.getElementById('status-message').textContent = '助理回應中...';
+            
+            audio.src = audioPath;
+            audio.classList.remove('hidden');
+            
+            return new Promise(resolve => {
+                audio.onended = () => {
+                    audio.classList.add('hidden');
+                    resolve();
+                };
+                audio.onerror = (e) => {
+                    appendLog(`❌ 音訊播放錯誤: ${e.message}`, 'error');
+                    audio.classList.add('hidden');
+                    resolve();
+                };
+                audio.play();
+            });
+        }
+        
+        function updateUIPanels(result) {
+            // 人格/模式
+            const personalityName = getPersonalityName(result.personality);
+            const isManual = result.new_manual_personality !== null;
+
+            document.getElementById('personality-display').textContent = `${getPersonalityIcon(result.personality)} ${personalityName}`;
+            
+            const modeTag = document.getElementById('personality-mode-tag');
+            modeTag.textContent = isManual ? '手動 (Manual)' : '自動 (Auto)';
+            modeTag.className = `status-tag ${isManual ? 'manual' : 'auto'}`;
+            
+            // 記憶趨勢 (這裡需要後端回傳 emotion_trend 資訊，如果沒有，請在 server.py 補充)
+            const trend = result.emotion_trend || 'stable'; 
+            const trendTag = document.getElementById('emotion-trend-tag');
+            trendTag.textContent = getTrendMessage(trend);
+            trendTag.className = `status-tag ${trend}`;
+
+            // 情緒信賴度
+            const textEmo = result.emotion_results?.text;
+            const audioEmo = result.emotion_results?.audio;
+            const facialEmo = result.emotion_results?.facial;
+            
+            document.getElementById('text-emotion').textContent = textEmo ? `${getEmotionZh(textEmo.emotion)} (${textEmo.emotion})` : '--';
+            document.getElementById('text-score').textContent = textEmo ? `${(textEmo.score * 100).toFixed(2)}%` : '0.00%';
+            
+            document.getElementById('audio-emotion').textContent = audioEmo ? `${getEmotionZh(audioEmo.emotion)} (${audioEmo.emotion})` : '--';
+            document.getElementById('audio-score').textContent = audioEmo ? `${(audioEmo.score * 100).toFixed(2)}%` : '0.00%';
+            
+            document.getElementById('facial-emotion').textContent = facialEmo ? `${getEmotionZh(facialEmo.emotion)} (${facialEmo.emotion})` : '--';
+            document.getElementById('facial-score').textContent = facialEmo ? `${(facialEmo.confidence * 100).toFixed(2)}%` : '0.00%';
+            document.getElementById('facial-frames').textContent = facialEmo ? `${facialEmo.num_valid_frames}/${facialEmo.num_total_frames}` : '0/0';
+            
+            // 表情顯示 (右側欄)
+            document.getElementById('assistant-emoji').textContent = getPersonalityIcon(result.personality);
+        }
+        
+        function resetRecordingState() {
+            document.getElementById('record-button').classList.remove('recording');
+            document.getElementById('record-text').textContent = '點擊開始錄音 (喚醒詞後開始)';
+            document.getElementById('record-status').textContent = '狀態: 閒置中...';
+            document.getElementById('status-message').textContent = '等待錄音中...';
+        }
+
+        // ------------------------------------------------------------------
+        // 輔助函數 (與前一個回答相同)
+        // ------------------------------------------------------------------
+
+        function appendLog(message, type = 'info') {
+            const logDisplay = document.getElementById('log-display');
+            const item = document.createElement('div');
+            item.className = 'log-item';
+            
+            let icon = 'ℹ️';
+            if (message.includes('成功')) icon = '✅';
+            if (message.includes('開始錄音')) icon = '🎙️';
+            if (message.includes('擷取')) icon = '📸';
+            if (message.includes('API 回傳')) icon = '📡';
+            if (message.includes('錯誤')) icon = '❌';
+
+            item.innerHTML = `${icon} ${message}`;
+            logDisplay.prepend(item); 
+            logDisplay.scrollTop = 0;
+        }
+
+        function getPersonalityName(id) {
+            const map = {
+                "comforting": "安撫型", "cheerful": "開朗型", "humorous": "幽默型",
+                "gentle": "溫柔型", "rational": "理性型", "encouraging": "鼓勵型",
+                "empathetic": "共鳴型"
+            };
+            return map[id] || "未知人格";
+        }
+        
+        function getPersonalityIcon(id) {
+            const map = {
+                "comforting": "🤗", "cheerful": "😄", "humorous": "😆",
+                "gentle": "💝", "rational": "🤔", "encouraging": "💪",
+                "empathetic": "😌"
+            };
+            return map[id] || "❓";
+        }
+
+        function getEmotionZh(en) {
+            const map = {
+                "angry": "憤怒", "happiness": "快樂", "sadness": "悲傷", "neutral": "中性",
+                "fear": "恐懼", "surprise": "驚訝", "disgust": "厭惡", "joy": "喜悅",
+                "care": "關切", "questioning": "疑問", "frustrated": "沮喪",
+                "happy": "快樂", "sad": "悲傷", "anger": "憤怒"
+            };
+            return map[en] || en;
+        }
+
+        function getTrendMessage(trend) {
+            if (trend === 'worsening') return '惡化中 🔻';
+            if (trend === 'improving') return '改善中 ⬆️';
+            return '穩定 (Stable) ⏸️';
+        }
+        
+        // 啟動時請求媒體權限
+        document.addEventListener('DOMContentLoaded', initMediaDevices);
+
+    </script>
+</body>
+</html>
