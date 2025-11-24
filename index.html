@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模2態助理 - Web 介面 (錄音除錯版)</title>
+    <title>AI 多模態助理 - Web 介面 (錄音除錯版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -403,30 +403,49 @@
             draw();
         }
 
+// 修改 index.html 中的 detectSilence 函數
         function detectSilence() {
             if (!analyserNode) return;
             visualizeAudio(); 
+            
             const bufferLength = analyserNode.fftSize;
             const buffer = new Uint8Array(bufferLength);
             let hasVoice = false;
             let lastActive = audioContext.currentTime;
             const detectionStartTime = audioContext.currentTime;
             
+            // 用來控制 Log 頻率
+            let debugCounter = 0;
+
             function loop() {
                 if (currentState !== STATE.RECORDING) return;
+                
                 analyserNode.getByteTimeDomainData(buffer);
                 let max = 0;
-                for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
+                // 計算當前幀的最大振幅 (0~128)
+                for (let i = 0; i < buffer.length; i++) {
+                    max = Math.max(max, Math.abs(buffer[i] - 128)); 
+                }
+                
                 const now = audioContext.currentTime;
 
+                // 🛑 除錯關鍵：每 0.5 秒印出一次目前音量
+                debugCounter++;
+                if (debugCounter % 30 === 0) {
+                    console.log(`🔊 目前音量: ${max} | 觸發閾值: ${VOICE_THRESHOLD} | 狀態: ${max > VOICE_THRESHOLD ? '🗣️ 有聲音' : '🔇 靜音'}`);
+                }
+
                 if (max > VOICE_THRESHOLD) { 
-                    if (!hasVoice) appendLog(`🗣️ 偵測到聲音 (Vol:${max})`);
+                    // 只有當音量真的大於閾值時，才更新「最後活動時間」
+                    if (!hasVoice) appendLog(`🗣️ 偵測到人聲 (Vol:${max})`);
                     hasVoice = true;
                     lastActive = now;
                 }
                 
+                // 靜音超時判斷
                 if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
-                    if ((now - detectionStartTime) > LOCK_SECONDS) { 
+                    // 安全期：錄音至少要跑 2 秒才允許自動停止 (避免剛點擊就斷)
+                    if ((now - detectionStartTime) > 2.0) { 
                         stopRecording(true);
                         return;
                     }
@@ -435,7 +454,6 @@
             }
             requestAnimationFrame(loop);
         }
-
         function updateDuration() {
             const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
             document.getElementById('duration-display').textContent = 
