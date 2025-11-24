@@ -22,9 +22,10 @@
         /* 錄音控制 */
         .record-control { text-align: center; margin-bottom: 20px; padding: 10px; border: 2px dashed #007bff; border-radius: 10px; }
         #record-button { padding: 15px 30px; font-size: 1.2em; background-color: #dc3545; color: white; border: none; border-radius: 50px; cursor: pointer; transition: background-color 0.3s, transform 0.1s; }
-        #record-button:hover { background-color: #c82333; }
-        #record-button:active { transform: scale(0.98); }
+        #record-button:hover:not(:disabled) { background-color: #c82333; }
+        #record-button:active:not(:disabled) { transform: scale(0.98); }
         #record-button.recording { background-color: #28a745; }
+        #record-button:disabled { opacity: 0.6; cursor: not-allowed; }
         
         /* 攝影機區 */
         #camera-preview { width: 100%; height: 200px; background-color: #333; margin-top: 10px; border-radius: 5px; overflow: hidden; }
@@ -38,6 +39,10 @@
         .status-tag.improving { background-color: #e6ffe6; color: #28a745; }
         .hidden { display: none; }
 
+        /* URL 輸入區 */
+        .url-input-group { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f8f8f8; }
+        .url-input-group input { width: calc(100% - 10px); padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-top: 5px; }
+
     </style>
 </head>
 <body>
@@ -45,9 +50,14 @@
         <div class="left-panel">
             <h1>💬 AI 多模態助理 (Web 介面)</h1>
             
+            <div class="url-input-group">
+                <label for="tunnel-url"><strong>🚨 Cloudflare Tunnel HTTPS 網址 (必填):</strong></label>
+                <input type="text" id="tunnel-url" placeholder="請貼上如 https://xxx.trycloudflare.com 的網址" oninput="checkUrlValidity()">
+            </div>
+
             <div class="record-control">
-                <button id="record-button" onclick="toggleRecording()">
-                    <span id="record-text">點擊開始錄音 (喚醒詞後開始)</span>
+                <button id="record-button" onclick="toggleRecording()" disabled>
+                    <span id="record-text">請先輸入 Tunnel 網址...</span>
                 </button>
                 <p id="record-status">狀態: 閒置中...</p>
                 <div id="camera-preview">
@@ -80,25 +90,19 @@
 
         <div class="right-panel">
             <h1>🎭 助理表情</h1>
-            <div id="status-message" class="main-status">等待錄音中...</div>
+            <div id="status-message" class="main-status">等待網址輸入...</div>
             <div id="assistant-emoji" class="emoji-display">
                 🤔
             </div>
             
             <h2>📜 執行 Log</h2>
             <div id="log-display" class="log-section">
-                <div class="log-item">ℹ️ 網頁初始化完成，請求麥克風/鏡頭權限中...</div>
+                <div class="log-item">ℹ️ 網頁初始化完成。請在上方輸入框貼上您的 Cloudflare Tunnel HTTPS 網址。</div>
             </div>
         </div>
     </div>
 
     <script>
-        // 設定您的 API 端點 (如果使用 Cloudflare Tunnel，這裡可能是公網 URL 或相對路徑)
-        // 假設 Flask Server 在同一台主機的 8000 port
-        const BASE_URL = "http://localhost:8000"; 
-        const API_PROCESS_ENDPOINT = BASE_URL + "/api/v1/process"; 
-        const API_DOWNLOAD_ENDPOINT = BASE_URL + "/api/v1/audio-download";
-
         // 全域狀態
         let mediaRecorder;
         let audioChunks = [];
@@ -113,11 +117,49 @@
         let sessionId = Date.now().toString();
 
         // ------------------------------------------------------------------
-        // 核心功能：錄音、拍照、上傳
+        // URL 處理與媒體權限檢查
         // ------------------------------------------------------------------
+        
+        let CURRENT_BASE_URL = null;
+        const API_PROCESS_PATH = "/api/v1/process"; 
+        const API_DOWNLOAD_PATH = "/api/v1/audio-download";
+
+        // 檢查網址輸入框的有效性
+        function checkUrlValidity() {
+            const urlInput = document.getElementById('tunnel-url');
+            const url = urlInput.value.trim();
+            const recordButton = document.getElementById('record-button');
+
+            try {
+                const urlObj = new URL(url);
+                // 必須是 HTTPS 才能啟用麥克風/鏡頭
+                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
+                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url; // 移除結尾斜線
+                    recordButton.disabled = false;
+                    document.getElementById('record-text').textContent = '點擊開始錄音 (喚醒詞後開始)';
+                    document.getElementById('status-message').textContent = '等待錄音中...';
+                    initMediaDevices(); // 網址有效後，嘗試獲取媒體權限
+                    urlInput.style.borderColor = '#28a745';
+                    appendLog(`✅ 偵測到有效 Tunnel 網址。正在請求媒體權限...`);
+                    return true;
+                } else {
+                    throw new Error("非 HTTPS 或格式錯誤");
+                }
+            } catch (e) {
+                CURRENT_BASE_URL = null;
+                recordButton.disabled = true;
+                recordButton.classList.remove('recording');
+                document.getElementById('record-text').textContent = '請先輸入 Tunnel 網址...';
+                document.getElementById('status-message').textContent = '等待網址輸入...';
+                urlInput.style.borderColor = '#dc3545';
+                return false;
+            }
+        }
 
         // 1. 請求麥克風和鏡頭權限
         async function initMediaDevices() {
+            if (mediaRecorder && videoTrack) return; // 避免重複初始化
+            
             try {
                 // 麥克風權限 (音訊)
                 const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -129,23 +171,30 @@
                 videoTrack = cameraStream.getVideoTracks()[0];
                 
                 // 初始化 MediaRecorder
-                mediaRecorder = new MediaRecorder(audioStream);
+                mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm;codecs=opus' }); // 改用 webm/opus，瀏覽器相容性更好
                 mediaRecorder.ondataavailable = event => {
                     audioChunks.push(event.data);
                 };
                 mediaRecorder.onstop = uploadData;
                 
-                document.getElementById('record-button').disabled = false;
-                appendLog(`✅ 麥克風與攝影機權限獲取成功！`, 'info');
+                appendLog(`✅ 麥克風與攝影機權限獲取成功！可以開始錄音。`, 'info');
 
             } catch (err) {
-                appendLog(`❌ 媒體權限錯誤: ${err.name} - ${err.message}`, 'error');
+                appendLog(`❌ 媒體權限錯誤: ${err.name} - ${err.message}。請確認網址為 HTTPS 且已允許權限。`, 'error');
                 document.getElementById('record-button').disabled = true;
             }
         }
         
+        // ------------------------------------------------------------------
+        // 核心功能：錄音、拍照、上傳
+        // ------------------------------------------------------------------
+        
         // 2. 錄音狀態切換
         function toggleRecording() {
+            if (!CURRENT_BASE_URL) {
+                appendLog('⚠️ 請先輸入並確認有效的 Tunnel 網址。', 'error');
+                return;
+            }
             if (isRecording) {
                 stopRecording();
             } else {
@@ -155,7 +204,7 @@
 
         function startRecording() {
             if (!mediaRecorder || !videoTrack) {
-                appendLog('⚠️ 錄音或鏡頭未準備好。請先授權。', 'error');
+                appendLog('⚠️ 錄音或鏡頭未準備好。請重試或檢查媒體權限。', 'error');
                 return;
             }
             
@@ -205,19 +254,22 @@
             canvas.toBlob(blob => {
                 if (blob) {
                     capturedImageBlobs.push(blob);
-                    appendLog(`   📸 擷取第 ${capturedImageBlobs.length} 幀圖片...`);
+                    // 為了減少 Log 輸出，只在開始和結束時顯示拍照 Log
+                    // appendLog(`   📸 擷取第 ${capturedImageBlobs.length} 幀圖片...`);
                 }
             }, 'image/jpeg', 0.8); // 80% 品質 JPEG
         }
         
         // 4. 打包與上傳數據
         async function uploadData() {
-            // 處理音訊塊為 Blob (這裡假設瀏覽器產生的是 WAV 或相容格式，但 WebM 更常見)
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' }); 
+            // 處理音訊塊為 Blob (注意：這裡將音訊類型改為 webm，後端可能需要 ffmpeg 處理)
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
             const formData = new FormData();
             
             // 1. 音訊檔案
-            formData.append('audio_file', audioBlob, `user_audio_${sessionId}.wav`);
+            // 由於後端 Whisper 傾向於處理 WAV，但瀏覽器多輸出 WebM/Opus。
+            // 這裡傳 WebM，後端可能需要修改 load_wav_to_numpy 來支援 WebM 格式。
+            formData.append('audio_file', audioBlob, `user_audio_${sessionId}.webm`); 
             
             // 2. 圖像檔案
             capturedImageBlobs.forEach((blob, index) => {
@@ -233,11 +285,13 @@
             };
             formData.append('turn_data', JSON.stringify(turnData));
             
-            appendLog(`📦 打包完成，音訊大小: ${(audioBlob.size / 1024).toFixed(2)} KB，圖片數: ${capturedImageBlobs.length}`);
+            appendLog(`📦 打包完成，音訊格式: WebM/Opus，圖片數: ${capturedImageBlobs.length}`);
             
+            const apiProcessUrl = CURRENT_BASE_URL + API_PROCESS_PATH;
+
             try {
                 // 呼叫後端 API
-                const response = await fetch(API_PROCESS_ENDPOINT, {
+                const response = await fetch(apiProcessUrl, {
                     method: 'POST',
                     body: formData
                 });
@@ -250,7 +304,7 @@
                 handleAPIReply(result);
 
             } catch (error) {
-                appendLog(`❌ API 錯誤: ${error.message}。請確認 Flask 伺服器已啟動並可連線。`, 'error');
+                appendLog(`❌ API 連線/執行錯誤: ${error.message}。請確認 Tunnel 網址是否正確且後端運行中。`, 'error');
                 document.getElementById('status-message').textContent = '連線錯誤！';
                 document.getElementById('assistant-emoji').textContent = '😵';
                 resetRecordingState();
@@ -276,13 +330,13 @@
             conversationHistory = result.updated_history || conversationHistory;
             manualPersonality = result.new_manual_personality;
             
-            const personalityName = getPersonalityName(result.personality);
-            const isManual = manualPersonality !== null;
-            
             document.getElementById('user-text').textContent = result.user_text;
             document.getElementById('assistant-reply').textContent = result.reply;
 
             // 處理 Log 顯示
+            const personalityName = getPersonalityName(result.personality);
+            const isManual = manualPersonality !== null;
+            
             appendLog(`📝 Whisper STT: "${result.user_text}"`);
             appendLog(`🔍 選定【${personalityName}】人格，模式: ${isManual ? '手動' : '自動'}`);
             
@@ -310,7 +364,8 @@
                 return;
             }
             
-            const audioPath = `${API_DOWNLOAD_ENDPOINT}?filename=${filename}`;
+            // 使用動態 BASE URL
+            const audioPath = CURRENT_BASE_URL + API_DOWNLOAD_PATH + `?filename=${filename}`;
             const audio = document.getElementById('tts-audio');
             
             appendLog(`🎶 正在下載並播放 TTS 檔案: ${filename}`);
@@ -320,16 +375,22 @@
             audio.classList.remove('hidden');
             
             return new Promise(resolve => {
+                audio.oncanplaythrough = () => { // 確保檔案可以播放
+                    audio.play().catch(e => {
+                        appendLog(`❌ 播放失敗: ${e.message}`, 'error');
+                        audio.classList.add('hidden');
+                        resolve();
+                    });
+                };
                 audio.onended = () => {
                     audio.classList.add('hidden');
                     resolve();
                 };
                 audio.onerror = (e) => {
-                    appendLog(`❌ 音訊播放錯誤: ${e.message}`, 'error');
+                    appendLog(`❌ 音訊下載/播放錯誤: 請檢查後端是否正確儲存 WAV 檔。`, 'error');
                     audio.classList.add('hidden');
                     resolve();
                 };
-                audio.play();
             });
         }
         
@@ -355,15 +416,34 @@
             const audioEmo = result.emotion_results?.audio;
             const facialEmo = result.emotion_results?.facial;
             
-            document.getElementById('text-emotion').textContent = textEmo ? `${getEmotionZh(textEmo.emotion)} (${textEmo.emotion})` : '--';
-            document.getElementById('text-score').textContent = textEmo ? `${(textEmo.score * 100).toFixed(2)}%` : '0.00%';
+            // 檢查並顯示文本情緒
+            if (textEmo) {
+                document.getElementById('text-emotion').textContent = `${getEmotionZh(textEmo.emotion)} (${textEmo.emotion})`;
+                document.getElementById('text-score').textContent = `${(textEmo.score * 100).toFixed(2)}%`;
+            } else {
+                 document.getElementById('text-emotion').textContent = '--';
+                 document.getElementById('text-score').textContent = '0.00%';
+            }
             
-            document.getElementById('audio-emotion').textContent = audioEmo ? `${getEmotionZh(audioEmo.emotion)} (${audioEmo.emotion})` : '--';
-            document.getElementById('audio-score').textContent = audioEmo ? `${(audioEmo.score * 100).toFixed(2)}%` : '0.00%';
-            
-            document.getElementById('facial-emotion').textContent = facialEmo ? `${getEmotionZh(facialEmo.emotion)} (${facialEmo.emotion})` : '--';
-            document.getElementById('facial-score').textContent = facialEmo ? `${(facialEmo.confidence * 100).toFixed(2)}%` : '0.00%';
-            document.getElementById('facial-frames').textContent = facialEmo ? `${facialEmo.num_valid_frames}/${facialEmo.num_total_frames}` : '0/0';
+            // 檢查並顯示語音情緒
+            if (audioEmo) {
+                document.getElementById('audio-emotion').textContent = `${getEmotionZh(audioEmo.emotion)} (${audioEmo.emotion})`;
+                document.getElementById('audio-score').textContent = `${(audioEmo.score * 100).toFixed(2)}%`;
+            } else {
+                 document.getElementById('audio-emotion').textContent = '--';
+                 document.getElementById('audio-score').textContent = '0.00%';
+            }
+
+            // 檢查並顯示臉部情緒
+            if (facialEmo) {
+                document.getElementById('facial-emotion').textContent = `${getEmotionZh(facialEmo.emotion)} (${facialEmo.emotion})`;
+                document.getElementById('facial-score').textContent = `${(facialEmo.confidence * 100).toFixed(2)}%`;
+                document.getElementById('facial-frames').textContent = `${facialEmo.num_valid_frames}/${facialEmo.num_total_frames}`;
+            } else {
+                 document.getElementById('facial-emotion').textContent = '--';
+                 document.getElementById('facial-score').textContent = '0.00%';
+                 document.getElementById('facial-frames').textContent = '0/0';
+            }
             
             // 表情顯示 (右側欄)
             document.getElementById('assistant-emoji').textContent = getPersonalityIcon(result.personality);
@@ -431,8 +511,10 @@
             return '穩定 (Stable) ⏸️';
         }
         
-        // 啟動時請求媒體權限
-        document.addEventListener('DOMContentLoaded', initMediaDevices);
+        // 網頁啟動時，只執行 URL 檢查 (URL 有效時才會觸發媒體權限請求)
+        document.addEventListener('DOMContentLoaded', () => {
+             checkUrlValidity();
+        });
 
     </script>
 </body>
