@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面 (穩定 VAD)</title>
+    <title>AI 多模12態助理 - Web 介面 (裝置選擇版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -33,6 +33,11 @@
         #audio-visualizer { position: absolute; bottom: 0; left: 0; width: 100%; height: 50px; background-color: rgba(0, 0, 0, 0.5); z-index: 10; border-radius: 0 0 5px 5px; }
         #duration-display { position: absolute; top: 5px; right: 10px; color: white; font-weight: bold; z-index: 11; }
 
+        /* URL 與 裝置輸入區 */
+        .input-group { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f8f8f8; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .input-group input, .input-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        
         /* 狀態標籤樣式 */
         .status-tag { display: inline-block; padding: 5px 10px; border-radius: 15px; font-weight: bold; margin: 5px 0; font-size: 0.9em; }
         .status-tag.auto { background-color: #e6f7ff; color: #007bff; }
@@ -41,10 +46,6 @@
         .status-tag.improving { background-color: #e6ffe6; color: #28a745; }
         .hidden { display: none; }
 
-        /* URL 輸入區 */
-        .url-input-group { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f8f8f8; }
-        .url-input-group input { width: calc(100% - 10px); padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-top: 5px; }
-
     </style>
 </head>
 <body>
@@ -52,9 +53,16 @@
         <div class="left-panel">
             <h1>💬 AI 多模態助理 (Web 介面)</h1>
             
-            <div class="url-input-group">
-                <label for="tunnel-url"><strong>🚨 Cloudflare Tunnel HTTPS 網址 (必填):</strong></label>
+            <div class="input-group">
+                <label for="tunnel-url">🚨 Cloudflare Tunnel HTTPS 網址 (必填):</label>
                 <input type="text" id="tunnel-url" placeholder="請貼上如 https://xxx.trycloudflare.com 的網址" oninput="checkUrlValidity()">
+            </div>
+
+            <div class="input-group">
+                <label for="mic-select">🎤 選擇麥克風裝置:</label>
+                <select id="mic-select" onchange="changeAudioInput()">
+                    <option value="" disabled selected>請先輸入網址以獲取權限...</option>
+                </select>
             </div>
 
             <div class="record-control">
@@ -121,9 +129,9 @@
         let audioStream; 
         let videoTrack; 
         let audioContext; 
-        let analyserNode; // 新增：用於視覺化
-        let recordingStartTime; // 新增：用於時長顯示
-        let durationTimer; // 新增：時長計時器
+        let analyserNode; 
+        let recordingStartTime; 
+        let durationTimer; 
         
         let audioChunks = []; 
         let capturedImageBlobs = []; 
@@ -131,8 +139,8 @@
         
         // VAD/錄音參數
         const SILENCE_TIMEOUT_SECONDS = 3; 
-        const VOICE_THRESHOLD = 15; 
-        const FRAME_RATE = 0.5; // 0.5 FPS 拍照
+        const VOICE_THRESHOLD = 20; // 稍微提高閾值以避免雜訊
+        const FRAME_RATE = 0.5; 
         const WAKE_WORD = "嗨小白"; 
         
         // 網路配置
@@ -159,7 +167,7 @@
                     recordText.textContent = '點擊開始錄音 (VAD 自動停止)';
                     recordStatus.textContent = '狀態: 閒置中...';
                     document.getElementById('status-message').textContent = '等待錄音中...';
-                    document.getElementById('duration-display').textContent = '00:00'; // 重置時長
+                    document.getElementById('duration-display').textContent = '00:00'; 
                     clearInterval(durationTimer);
                     break;
                     
@@ -169,7 +177,6 @@
                     recordText.textContent = '正在錄音/拍照... (請說話)';
                     recordStatus.textContent = '狀態: 錄音中 (靜音 ' + SILENCE_TIMEOUT_SECONDS + 's 自動停止)';
                     document.getElementById('status-message').textContent = '請說話...';
-                    // 啟動時長計時器
                     recordingStartTime = Date.now();
                     durationTimer = setInterval(updateDuration, 1000);
                     break;
@@ -190,14 +197,13 @@
                 return;
             }
             if (!audioStream || !videoTrack) {
-                appendLog('⚠️ 媒體裝置未初始化。', 'error');
+                appendLog('⚠️ 媒體裝置未初始化。請檢查麥克風選單。', 'error');
                 return;
             }
             
             if (currentState === STATE.IDLE) {
                 startRecording();
             } else if (currentState === STATE.RECORDING) {
-                // 錄音中禁用按鈕，強制VAD介入
                 appendLog('⚠️ 錄音中，請勿點擊，請說完話靜音等待系統自動停止。', 'warning');
                 return;
             }
@@ -211,27 +217,31 @@
             capturedImageBlobs = [];
             
             // 1. 啟動 Media Recorder
-            mediaRecorder = new MediaRecorder(audioStream);
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            mediaRecorder.onstop = uploadData; 
-            mediaRecorder.start();
-            
-            appendLog(`🎙️ 開始錄音，同步啟動拍照和靜音偵測...`);
+            try {
+                mediaRecorder = new MediaRecorder(audioStream);
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = uploadData; 
+                mediaRecorder.start();
+                
+                appendLog(`🎙️ 開始錄音，同步啟動拍照和靜音偵測...`);
 
-            // 2. 啟動拍照 (0.5 FPS)
-            startFaceCapture();
-            
-            // 3. 啟動 VAD 和視覺化
-            setupAudioAnalysis(audioStream);
-            
-            // 4. 啟動靜音偵測
-            detectSilence(); 
+                // 2. 啟動拍照
+                startFaceCapture();
+                
+                // 3. 啟動 VAD 和視覺化
+                setupAudioAnalysis(audioStream);
+                
+                // 4. 啟動靜音偵測
+                detectSilence(); 
+            } catch (e) {
+                appendLog(`❌ 錄音啟動失敗: ${e.message}`, 'error');
+                updateState(STATE.IDLE);
+            }
         }
 
         function stopRecording(isSilentStop = true) {
             if (currentState !== STATE.RECORDING) return;
 
-            // 停止所有相關的 streams
             stopFaceCapture();
             if (mediaRecorder && mediaRecorder.state === "recording") {
                  mediaRecorder.stop();
@@ -241,21 +251,138 @@
                  audioContext = null;
             }
             
-            // 清理視覺化，保持最後一幀數據
             const canvas = document.getElementById('audio-visualizer');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-
             if (isSilentStop) {
                  appendLog(`🛑 偵測到 ${SILENCE_TIMEOUT_SECONDS} 秒無聲，自動結束錄音。總長度: ${document.getElementById('duration-display').textContent}`);
             } else {
-                 appendLog(`🛑 使用者強制停止錄音。總長度: ${document.getElementById('duration-display').textContent}`);
+                 appendLog(`🛑 使用者強制停止錄音。`);
             }
             
             updateState(STATE.PROCESSING); 
         }
         
+        // ------------------------------------------------------------------
+        // 裝置選擇與初始化 (新增功能)
+        // ------------------------------------------------------------------
+
+        async function getAudioDevices() {
+            const select = document.getElementById('mic-select');
+            select.innerHTML = '<option value="" disabled>正在掃描裝置...</option>';
+            
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+                
+                select.innerHTML = ''; // 清空
+                if (audioInputs.length === 0) {
+                    const option = document.createElement('option');
+                    option.text = "未偵測到麥克風";
+                    select.add(option);
+                    return;
+                }
+
+                audioInputs.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `麥克風 ${select.length + 1}`;
+                    select.add(option);
+                });
+                
+                // 自動選擇第一個，或上次選擇的
+                if (audioInputs.length > 0) {
+                    select.value = audioInputs[0].deviceId;
+                    // 立即使用第一個裝置初始化
+                    initMediaDevices(audioInputs[0].deviceId);
+                }
+                
+                appendLog(`🎤 發現 ${audioInputs.length} 個麥克風裝置。請在選單中選擇正確的麥克風。`, 'info');
+
+            } catch (e) {
+                appendLog(`⚠️ 無法列舉裝置: ${e.message}`, 'error');
+                select.innerHTML = '<option value="" disabled>無法獲取裝置清單</option>';
+            }
+        }
+
+        async function changeAudioInput() {
+            const select = document.getElementById('mic-select');
+            const deviceId = select.value;
+            if (deviceId) {
+                appendLog(`🔄 切換麥克風至: ${select.options[select.selectedIndex].text}`);
+                await initMediaDevices(deviceId);
+            }
+        }
+
+        async function initMediaDevices(deviceId = null) {
+            // 如果已有 stream，先停止
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+            }
+            
+            const constraints = {
+                audio: {
+                    deviceId: deviceId ? { exact: deviceId } : undefined,
+                    echoCancellation: false, // 關閉回音消除以獲得原始音訊
+                    noiseSuppression: false, // 關閉降噪
+                    autoGainControl: false   // 關閉自動增益
+                },
+                video: { width: 640, height: 480 }
+            };
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                audioStream = stream;
+                
+                const videoElement = document.getElementById('video-stream');
+                videoElement.srcObject = stream;
+                videoTrack = stream.getVideoTracks()[0];
+                
+                appendLog(`✅ 媒體裝置初始化成功！(ID: ${deviceId ? deviceId.substring(0,8)+'...' : 'Default'})`);
+                document.getElementById('record-button').disabled = false;
+
+            } catch (err) {
+                appendLog(`❌ 媒體初始化失敗: ${err.name} - ${err.message}`, 'error');
+                document.getElementById('record-button').disabled = true;
+            }
+        }
+
+        function checkUrlValidity() {
+            const urlInput = document.getElementById('tunnel-url');
+            const url = urlInput.value.trim();
+            const recordButton = document.getElementById('record-button');
+
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
+                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
+                    urlInput.style.borderColor = '#28a745';
+                    appendLog(`✅ 網址有效。正在請求裝置清單...`);
+                    
+                    // 第一次請求權限以獲取完整標籤
+                    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                        .then(stream => {
+                            // 成功獲取權限後，停止這個臨時 stream，並列舉裝置
+                            stream.getTracks().forEach(t => t.stop());
+                            getAudioDevices();
+                        })
+                        .catch(err => {
+                            appendLog(`❌ 需要麥克風權限才能列出裝置: ${err.message}`, 'error');
+                        });
+                        
+                    return true;
+                } else {
+                    throw new Error("非 HTTPS 或格式錯誤");
+                }
+            } catch (e) {
+                CURRENT_BASE_URL = null;
+                recordButton.disabled = true;
+                urlInput.style.borderColor = '#dc3545';
+                return false;
+            }
+        }
+
         // ------------------------------------------------------------------
         // 核心邏輯：靜音偵測 (Browser-side VAD)
         // ------------------------------------------------------------------
@@ -264,11 +391,10 @@
             if (audioContext) audioContext.close();
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const source = audioContext.createMediaStreamSource(stream);
-            analyserNode = audioContext.createAnalyser(); // 設定為全域變數
+            analyserNode = audioContext.createAnalyser(); 
             
             analyserNode.fftSize = 2048; 
             source.connect(analyserNode);
-            // 視覺化不需要連接到 destination
         }
 
         function visualizeAudio() {
@@ -288,11 +414,11 @@
                 requestAnimationFrame(draw);
                 analyserNode.getByteTimeDomainData(dataArray);
 
-                ctx.fillStyle = 'rgba(0, 0, 0, 0)'; // 透明背景
-                ctx.fillRect(0, 0, WIDTH, HEIGHT);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0)'; 
+                ctx.clearRect(0, 0, WIDTH, HEIGHT); // Clear previous frame
                 
                 ctx.lineWidth = 2;
-                ctx.strokeStyle = 'rgb(0, 255, 0)'; // 綠色波形
+                ctx.strokeStyle = 'rgb(0, 255, 0)'; 
                 
                 ctx.beginPath();
                 
@@ -320,13 +446,14 @@
 
         function detectSilence() {
             if (!analyserNode) return;
-            visualizeAudio(); // 啟動視覺化
+            visualizeAudio(); 
             
             const bufferLength = analyserNode.fftSize;
             const buffer = new Uint8Array(bufferLength);
 
             let hasVoice = false;
             let lastActive = audioContext.currentTime;
+            const detectionStartTime = audioContext.currentTime;
 
             function loop() {
                 if (currentState !== STATE.RECORDING) return;
@@ -341,18 +468,21 @@
 
                 if (max > VOICE_THRESHOLD) { 
                     if (!hasVoice) {
-                        appendLog(`🗣️ 偵測到人聲，開始啟動靜音計時監控 (Max:${max})`);
+                        appendLog(`🗣️ 偵測到人聲 (Max:${max})`);
                     }
                     hasVoice = true;
                     lastActive = now;
                 }
                 
+                // 安全期 2 秒 + 靜音超時
                 if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
-                    stopRecording(true);
-                    return;
+                    if ((now - detectionStartTime) > 2.0) {
+                        stopRecording(true);
+                        return;
+                    }
                 }
 
-                requestAnimationFrame(loop); // 繼續 VAD 檢測
+                requestAnimationFrame(loop);
             }
 
             requestAnimationFrame(loop);
@@ -438,62 +568,7 @@
             }
         }
         
-        // ------------------------------------------------------------------
-        // 輔助函數 (媒體 & UI)
-        // ------------------------------------------------------------------
-
-        function checkUrlValidity() {
-            const urlInput = document.getElementById('tunnel-url');
-            const url = urlInput.value.trim();
-            const recordButton = document.getElementById('record-button');
-
-            try {
-                const urlObj = new URL(url);
-                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
-                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
-                    recordButton.disabled = false;
-                    document.getElementById('record-text').textContent = '點擊開始錄音 (VAD 自動停止)';
-                    document.getElementById('status-message').textContent = '等待錄音中...';
-                    initMediaDevices(); 
-                    urlInput.style.borderColor = '#28a745';
-                    appendLog(`✅ 偵測到有效 Tunnel 網址。正在請求媒體權限...`);
-                    return true;
-                } else {
-                    throw new Error("非 HTTPS 或格式錯誤");
-                }
-            } catch (e) {
-                CURRENT_BASE_URL = null;
-                recordButton.disabled = true;
-                recordButton.classList.remove('recording');
-                document.getElementById('record-text').textContent = '請先輸入 Tunnel 網址...';
-                document.getElementById('status-message').textContent = '等待網址輸入...';
-                urlInput.style.borderColor = '#dc3545';
-                return false;
-            }
-        }
-
-        async function initMediaDevices() {
-            if (audioStream && videoTrack) return;
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: true, 
-                    video: { width: 640, height: 480 } 
-                });
-                
-                audioStream = stream;
-                
-                const videoElement = document.getElementById('video-stream');
-                videoElement.srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
-                
-                appendLog(`✅ 麥克風與攝影機權限獲取成功！`);
-
-            } catch (err) {
-                appendLog(`❌ 媒體權限錯誤: ${err.name} - ${err.message}。請確認網址為 HTTPS 且已允許權限。`, 'error');
-                document.getElementById('record-button').disabled = true;
-            }
-        }
+        // ... (handleAPIReply, playTTSAudio, updateUIPanels, appendLog 等輔助函數保持不變) ...
         
         async function handleAPIReply(result) {
             updateState(STATE.PROCESSING); 
@@ -620,7 +695,6 @@
             logDisplay.scrollTop = 0;
         }
 
-        // 輔助函式 (不變)
         function getPersonalityName(id) { 
              const map = {
                 "comforting": "安撫型", "cheerful": "開朗型", "humorous": "幽默型",
@@ -652,7 +726,6 @@
             return '穩定 (Stable) ⏸️';
         }
 
-        // 啟動時執行 URL 檢查
         document.addEventListener('DOMContentLoaded', () => {
              document.getElementById('record-button').addEventListener('click', toggleRecording);
              checkUrlValidity();
