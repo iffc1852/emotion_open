@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面 (穩定 VAD)</title>
+    <title>AI 多模1態助理 - Web 介面 (穩定 VAD)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -126,7 +126,7 @@
         const SILENCE_TIMEOUT_SECONDS = 3; 
         const VOICE_THRESHOLD = 15; 
         const FRAME_RATE = 0.5; // 0.5 FPS 拍照
-        const WAKE_WORD = "嗨小白"; 
+        const WAKE_WORD = "嗨小白"; // 僅用於 turn_data 傳輸，後端已忽略檢查
         
         // 網路配置
         let CURRENT_BASE_URL = null;
@@ -149,17 +149,18 @@
                 case STATE.IDLE:
                     button.disabled = false;
                     button.classList.remove('recording');
-                    recordText.textContent = '點擊開始錄音 (含喚醒詞)';
+                    recordText.textContent = '點擊開始錄音 (VAD 自動停止)';
                     recordStatus.textContent = '狀態: 閒置中...';
                     document.getElementById('status-message').textContent = '等待錄音中...';
                     break;
                     
                 case STATE.RECORDING:
                     button.classList.add('recording');
-                    button.disabled = false;
-                    recordText.textContent = '正在錄音/拍照... 點擊強制結束';
+                    // 🚨 錄音中禁用按鈕，強制VAD介入
+                    button.disabled = true; 
+                    recordText.textContent = '正在錄音/拍照... (請說話)';
                     recordStatus.textContent = '狀態: 錄音中 (靜音 ' + SILENCE_TIMEOUT_SECONDS + 's 自動停止)';
-                    document.getElementById('status-message').textContent = '請說「嗨小白」和對話...';
+                    document.getElementById('status-message').textContent = '請開始說話...';
                     break;
                     
                 case STATE.PROCESSING:
@@ -184,8 +185,8 @@
             if (currentState === STATE.IDLE) {
                 startRecording();
             } else if (currentState === STATE.RECORDING) {
-                // 強制停止，觸發上傳
-                stopRecording(false);
+                // 由於按鈕已被禁用，如果在這裡被呼叫，則可能是權限問題，但通常會被前面的 disabled 攔截
+                appendLog('⚠️ 錄音中，請勿點擊，請說完話靜音等待系統自動停止。', 'warning');
             }
         }
 
@@ -199,8 +200,6 @@
             // 1. 啟動 Media Recorder
             mediaRecorder = new MediaRecorder(audioStream);
             mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-            
-            // 錄音結束後自動觸發上傳
             mediaRecorder.onstop = uploadData; 
             mediaRecorder.start();
             
@@ -232,7 +231,6 @@
                  appendLog(`🛑 使用者強制停止錄音。`);
             }
             
-            // 狀態將在 mediaRecorder.onstop -> uploadData 前轉換為 PROCESSING
             updateState(STATE.PROCESSING); 
         }
         
@@ -265,7 +263,7 @@
                 
                 const now = audioContext.currentTime;
 
-                if (max > VOICE_THRESHOLD) { // 聲音大於閾值
+                if (max > VOICE_THRESHOLD) { 
                     if (!hasVoice) {
                         appendLog(`🗣️ 偵測到人聲，開始啟動靜音計時監控 (Max:${max})`);
                     }
@@ -273,14 +271,11 @@
                     lastActive = now;
                 }
                 
-                // 檢查靜音超時 (只在偵測到人聲後才開始計算)
                 if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
-                    // 達到靜音超時，自動停止
                     stopRecording(true);
                     return;
                 }
 
-                // 繼續下一幀偵測
                 requestAnimationFrame(loop);
             }
 
@@ -322,7 +317,6 @@
             // 這個函數由 mediaRecorder.onstop 自動觸發
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
             
-            // 檢查錄音內容是否太短 
             if (audioBlob.size < 5000) {
                 appendLog('⚠️ 錄音內容過短或沒有人聲，跳過處理，回到待命。', 'warning');
                 updateState(STATE.IDLE);
@@ -380,7 +374,7 @@
                 if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
                     CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
                     recordButton.disabled = false;
-                    document.getElementById('record-text').textContent = '點擊開始錄音 (含喚醒詞)';
+                    document.getElementById('record-text').textContent = '點擊開始錄音 (VAD 自動停止)';
                     document.getElementById('status-message').textContent = '等待錄音中...';
                     initMediaDevices(); 
                     urlInput.style.borderColor = '#28a745';
@@ -404,7 +398,6 @@
             if (audioStream && videoTrack) return;
             
             try {
-                // 麥克風和鏡頭一次請求
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: true, 
                     video: { width: 640, height: 480 } 
@@ -427,17 +420,15 @@
         async function handleAPIReply(result) {
             updateState(STATE.PROCESSING); 
 
+            // 🚨 喚醒詞檢查已移除，後端應始終回傳 True
             if (result.is_wake_detected === false) {
-                appendLog(`⚠️ STT 結果為：「${result.user_text}」，但未偵測到喚醒詞「${WAKE_WORD}」。`, 'warning');
+                 // 這裡邏輯理論上不會觸發，除非後端代碼未完全移除喚醒詞檢查
+                appendLog(`⚠️ 後端回傳喚醒失敗，請檢查 server.py 是否已移除喚醒詞檢查區塊。`, 'warning');
                 document.getElementById('user-text').textContent = result.user_text;
-                document.getElementById('assistant-reply').textContent = result.reply || '(喚醒失敗，未回應)';
-                await playTTSAudio(result.tts_audio_file); 
-                updateState(STATE.IDLE); 
+                document.getElementById('assistant-reply').textContent = result.reply || '(喚醒失敗)';
+                updateState(STATE.IDLE);
                 return;
             }
-            
-            // 更新狀態
-            // conversationHistory = result.updated_history || conversationHistory; // 保持歷史紀錄
             
             document.getElementById('user-text').textContent = result.user_text;
             document.getElementById('assistant-reply').textContent = result.reply;
