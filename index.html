@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面 (前端喚醒)</title>
+    <title>AI 多模態助理 - Web 介面 (穩1定 VAD)</title>
     <style>
-        /* (CSS 樣式保持不變) */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
         .left-panel { flex: 2; padding: 20px; border-right: 1px solid #eee; background-color: #ffffff; }
@@ -43,6 +42,7 @@
         /* URL 輸入區 */
         .url-input-group { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f8f8f8; }
         .url-input-group input { width: calc(100% - 10px); padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-top: 5px; }
+
     </style>
 </head>
 <body>
@@ -104,35 +104,31 @@
 
     <script>
         // -----------------------------------------------------
-        // 核心載入 (Web Speech API / 模擬 AI 模型)
+        // 核心狀態與參數
         // -----------------------------------------------------
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let rec = null; // 喚醒監聽實例
-        
-        // 狀態定義
         const STATE = {
             IDLE: 'IDLE',
-            LISTENING: 'LISTENING', // 監聽喚醒詞模式 (前端輕量級)
-            RECORDING: 'RECORDING', // 錄音/拍照模式 (喚醒成功後)
+            RECORDING: 'RECORDING', 
             PROCESSING: 'PROCESSING'
         };
 
-        // 全域狀態
         let currentState = STATE.IDLE;
-        let mediaRecorder; // 錄音實例
-        let audioStream; // 麥克風音訊流
-        let videoTrack; // 攝影機軌道
-        let audioChunks = []; // 錄音數據塊
-        let capturedImageBlobs = []; // 拍照數據塊
+        let mediaRecorder; 
+        let audioStream; 
+        let videoTrack; 
+        let audioContext; 
+        
+        let audioChunks = []; 
+        let capturedImageBlobs = []; 
         let captureInterval;
-
-        // 靜音偵測參數 (用於 RECORDING 模式自動停止)
+        
+        // VAD/錄音參數
         const SILENCE_TIMEOUT_SECONDS = 3; 
         const VOICE_THRESHOLD = 15; 
-        const FRAME_RATE = 0.5; // 0.5 FPS
+        const FRAME_RATE = 0.5; // 0.5 FPS 拍照
         const WAKE_WORD = "嗨小白"; 
         
-        // 網路配置 (URL 輸入框動態取得)
+        // 網路配置
         let CURRENT_BASE_URL = null;
         const API_PROCESS_PATH = "/api/v1/process"; 
         const API_DOWNLOAD_PATH = "/api/v1/audio-download";
@@ -153,41 +149,28 @@
                 case STATE.IDLE:
                     button.disabled = false;
                     button.classList.remove('recording');
-                    recordText.textContent = '點擊開始監聽喚醒詞';
+                    recordText.textContent = '點擊開始錄音 (含喚醒詞)';
                     recordStatus.textContent = '狀態: 閒置中...';
-                    document.getElementById('status-message').textContent = '等待點擊開始監聽...';
-                    if (rec && rec.stop) rec.stop(); // 停止 Web Speech API
-                    stopRecordingStreams(); // 確保 MediaRecorder 相關已停止
+                    document.getElementById('status-message').textContent = '等待錄音中...';
                     break;
                     
-                case STATE.LISTENING:
-                    button.classList.add('recording');
-                    recordText.textContent = '正在監聽喚醒詞... 點擊強制停止';
-                    recordStatus.textContent = '狀態: 輕量級喚醒監聽中';
-                    document.getElementById('status-message').textContent = `請說「${WAKE_WORD}」...`;
-                    startWakeListener(); // 啟動 Web Speech API 監聽
-                    break;
-
                 case STATE.RECORDING:
                     button.classList.add('recording');
+                    button.disabled = false;
                     recordText.textContent = '正在錄音/拍照... 點擊強制結束';
-                    recordStatus.textContent = '狀態: 對話中 (同步拍照 & VAD 靜音檢測)';
-                    document.getElementById('status-message').textContent = '喚醒成功！請繼續說話...';
-                    // 啟動實際的錄音和拍照
-                    startMainRecording(); 
-                    startFaceCapture(); 
+                    recordStatus.textContent = '狀態: 錄音中 (靜音 ' + SILENCE_TIMEOUT_SECONDS + 's 自動停止)';
+                    document.getElementById('status-message').textContent = '請說「嗨小白」和對話...';
                     break;
                     
                 case STATE.PROCESSING:
                     button.disabled = true;
-                    stopRecordingStreams();
                     recordText.textContent = '運算中... 請稍候';
                     recordStatus.textContent = '狀態: 數據處理中...';
                     document.getElementById('status-message').textContent = 'AI 運算中...';
                     break;
             }
         }
-        
+
         function toggleRecording() {
             if (!CURRENT_BASE_URL) {
                 appendLog('⚠️ 請先輸入並確認有效的 Tunnel 網址。', 'error');
@@ -199,121 +182,66 @@
             }
             
             if (currentState === STATE.IDLE) {
-                // 從 IDLE -> 進入 LISTENING 模式
-                updateState(STATE.LISTENING);
-            } else if (currentState === STATE.LISTENING || currentState === STATE.RECORDING) {
-                // 從 LISTENING 或 RECORDING -> 進入 PROCESSING (強制停止)
+                startRecording();
+            } else if (currentState === STATE.RECORDING) {
+                // 強制停止，觸發上傳
                 stopRecording(false);
-                updateState(STATE.PROCESSING);
-                if (mediaRecorder.state === 'recording') {
-                    mediaRecorder.stop(); // MediaRecorder onstop 會觸發 uploadData
-                } else {
-                    // 如果在 LISTENING 模式下被停止，沒有數據要上傳，直接回 IDLE
-                    updateState(STATE.IDLE); 
-                }
             }
         }
-        
-        function stopRecordingStreams() {
-            // 停止所有相關的 streams
-            if (rec && rec.abort) rec.abort(); // 停止 Web Speech API
-            stopFaceCapture();
-            // 注意：MediaRecorder.stop() 必須在外面呼叫，以便觸發 onstop event
-        }
 
-
-        // ------------------------------------------------------------------
-        // 階段 1: 喚醒監聽 (Web Speech API 實現)
-        // ------------------------------------------------------------------
-
-        function startWakeListener() {
-            if (!SpeechRecognition) {
-                appendLog('❌ 瀏覽器不支援 Web Speech API (SpeechRecognition)。請使用 Chrome/Edge。', 'error');
-                updateState(STATE.IDLE);
-                return;
-            }
+        async function startRecording() {
+            if (currentState !== STATE.IDLE) return;
             
-            rec = new SpeechRecognition();
-            rec.lang = "zh-TW";
-            rec.continuous = false; // 必須為 false 才能在 onend 觸發時得到最終結果
-            rec.interimResults = false;
-            
-            rec.onresult = (e) => {
-                const txt = e.results[e.results.length - 1][0].transcript.trim();
-                appendLog(`🎧 聽到 (Speech API): "${txt}"`);
-                
-                // 檢查喚醒詞
-                if (txt.includes(WAKE_WORD)) {
-                    appendLog(`✅ 偵測到喚醒詞「${WAKE_WORD}」！`);
-                    rec.abort(); // 立即中止當前的辨識，以啟動 onend
-                    // 🚨 這裡需要確保 MediaRecorder 可以啟動，但 Rec.abort() 不會完全釋放 Mic
-                    
-                    // 跳轉到 RECORDING 狀態
-                    updateState(STATE.RECORDING); 
-                    
-                } else {
-                    // 如果沒聽到喚醒詞，重新啟動監聽
-                    setTimeout(() => { rec.start().catch(() => {}); }, 100);
-                }
-            };
-            
-            rec.onerror = (err) => {
-                if (err.error !== "aborted") {
-                    appendLog(`⚠️ 喚醒監聽錯誤: ${err.error}`, 'warning');
-                }
-                // 即使錯誤，也要確保重新啟動，維持持續監聽
-                // setTimeout(() => { rec.start().catch(() => {}); }, 500);
-            };
-
-            rec.onend = () => {
-                // 如果當前狀態不是 RECORDING 或 PROCESSING，則重新啟動監聽 (維持持續性)
-                if (currentState === STATE.LISTENING) {
-                     appendLog("🔁 喚醒監聽重啟中...");
-                     setTimeout(() => { rec.start().catch(() => {}); }, 500);
-                }
-            };
-
-            rec.start().catch((e) => {
-                if (e.name !== 'InvalidStateError') { // 忽略已在運行中的錯誤
-                    appendLog(`❌ 喚醒監聽啟動失敗: ${e.name}`, 'error');
-                    updateState(STATE.IDLE);
-                }
-            });
-        }
-
-
-        // ------------------------------------------------------------------
-        // 階段 2: 錄音主流程 (喚醒成功後執行)
-        // ------------------------------------------------------------------
-        
-        function startMainRecording() {
-            // 確保 MediaRecorder 實例是新的，且綁定到已釋放的 audioStream
-            // 由於 Web Speech API 和 MediaRecorder 搶佔 Mic，這裡需要強制重啟 stream
-            
-            // 由於這是 Web 端最大的技術難點，我們必須信任 audioStream 已經可用
+            updateState(STATE.RECORDING);
             audioChunks = [];
+            capturedImageBlobs = [];
             
-            try {
-                mediaRecorder = new MediaRecorder(audioStream);
-                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-                mediaRecorder.onstop = uploadData;
-                
-                // 🔹 啟動錄音
-                mediaRecorder.start();
+            // 1. 啟動 Media Recorder
+            mediaRecorder = new MediaRecorder(audioStream);
+            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
             
-                // 啟動靜音偵測
-                detectSilence(audioStream); 
-                
-            } catch(e) {
-                 appendLog(`❌ 錄音啟動失敗：MediaRecorder 錯誤或麥克風被佔用。`, 'error');
-                 updateState(STATE.IDLE);
+            // 錄音結束後自動觸發上傳
+            mediaRecorder.onstop = uploadData; 
+            mediaRecorder.start();
+            
+            appendLog(`🎙️ 開始錄音，同步啟動拍照和靜音偵測...`);
+
+            // 2. 啟動拍照 (0.5 FPS)
+            startFaceCapture();
+            
+            // 3. 啟動靜音偵測
+            detectSilence(audioStream); 
+        }
+
+        function stopRecording(isSilentStop = true) {
+            if (currentState !== STATE.RECORDING) return;
+
+            // 停止所有相關的 streams
+            stopFaceCapture();
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                 mediaRecorder.stop();
             }
+            if (audioContext) {
+                 audioContext.close(); 
+                 audioContext = null;
+            }
+
+            if (isSilentStop) {
+                 appendLog(`🛑 偵測到 ${SILENCE_TIMEOUT_SECONDS} 秒無聲，自動結束錄音。`);
+            } else {
+                 appendLog(`🛑 使用者強制停止錄音。`);
+            }
+            
+            // 狀態將在 mediaRecorder.onstop -> uploadData 前轉換為 PROCESSING
+            updateState(STATE.PROCESSING); 
         }
         
-        // ... (detectSilence 函數保持不變) ...
+        // ------------------------------------------------------------------
+        // 核心邏輯：靜音偵測 (Browser-side VAD)
+        // ------------------------------------------------------------------
+
         function detectSilence(stream) {
-            // ... (與上一個版本相同，用於 VAD 自動停止錄音) ...
-             if (audioContext) audioContext.close(); // 確保舊的 Context 已關閉
+            if (audioContext) audioContext.close(); 
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const source = audioContext.createMediaStreamSource(stream);
             const analyser = audioContext.createAnalyser();
@@ -323,7 +251,6 @@
             
             const buffer = new Uint8Array(analyser.fftSize);
 
-            let silenceDuration = 0;
             let hasVoice = false;
             let lastActive = audioContext.currentTime;
 
@@ -338,53 +265,28 @@
                 
                 const now = audioContext.currentTime;
 
-                if (max > VOICE_THRESHOLD) { 
+                if (max > VOICE_THRESHOLD) { // 聲音大於閾值
                     if (!hasVoice) {
                         appendLog(`🗣️ 偵測到人聲，開始啟動靜音計時監控 (Max:${max})`);
                     }
                     hasVoice = true;
                     lastActive = now;
-                    silenceDuration = 0;
-                } else if (hasVoice) {
-                    silenceDuration = now - lastActive;
                 }
-
-                if (hasVoice && silenceDuration >= SILENCE_TIMEOUT_SECONDS) {
+                
+                // 檢查靜音超時 (只在偵測到人聲後才開始計算)
+                if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
                     // 達到靜音超時，自動停止
                     stopRecording(true);
                     return;
                 }
 
+                // 繼續下一幀偵測
                 requestAnimationFrame(loop);
             }
 
             requestAnimationFrame(loop);
         }
-
-        function stopRecording(isSilentStop = true) {
-            if (currentState !== STATE.RECORDING) return;
-            
-            // 停止 VAD 偵測
-            if (audioContext) {
-                 audioContext.close(); 
-                 audioContext = null;
-            }
-
-            if (isSilentStop) {
-                 appendLog(`🛑 偵測到 ${SILENCE_TIMEOUT_SECONDS} 秒無聲，自動結束錄音。`);
-            } else {
-                 appendLog(`🛑 使用者強制停止錄音。`);
-            }
-            
-            // 停止拍照和 MediaRecorder (onstop 會觸發 uploadData)
-            stopFaceCapture();
-            if (mediaRecorder.state === "recording") {
-                 mediaRecorder.stop();
-            }
-            // 狀態機在 mediaRecorder.onstop -> uploadData -> handleAPIReply 結束後會回到 IDLE
-        }
-
-
+        
         // ------------------------------------------------------------------
         // 核心邏輯：拍照與上傳
         // ------------------------------------------------------------------
@@ -398,7 +300,7 @@
              clearInterval(captureInterval); 
         }
 
-        function captureImage() { /* ... (保持不變) ... */
+        function captureImage() {
             if (!videoTrack) return;
             
             const canvas = document.createElement('canvas');
@@ -419,13 +321,15 @@
         async function uploadData() {
             // 這個函數由 mediaRecorder.onstop 自動觸發
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
-            const formData = new FormData();
             
-            if (audioBlob.size < 5000 && capturedImageBlobs.length < 5) {
+            // 檢查錄音內容是否太短 
+            if (audioBlob.size < 5000) {
                 appendLog('⚠️ 錄音內容過短或沒有人聲，跳過處理，回到待命。', 'warning');
                 updateState(STATE.IDLE);
                 return;
             }
+            
+            const formData = new FormData();
             
             // 1. 音訊檔案
             formData.append('audio_file', audioBlob, `user_audio_final_${Date.now()}.webm`); 
@@ -438,9 +342,9 @@
             // 3. 對話數據 (JSON)
             const turnData = {
                 session_id: Date.now().toString(), 
-                history: [], // 喚醒模式下，歷史紀錄通常重設或僅在後端管理
+                history: [], 
                 current_personality: null,
-                wake_word: WAKE_WORD // 仍然將喚醒詞傳給後端進行最終確認
+                wake_word: WAKE_WORD
             };
             formData.append('turn_data', JSON.stringify(turnData));
             
@@ -465,11 +369,42 @@
         // ------------------------------------------------------------------
         // 輔助函數 (媒體 & UI)
         // ------------------------------------------------------------------
-        
+
+        function checkUrlValidity() {
+            const urlInput = document.getElementById('tunnel-url');
+            const url = urlInput.value.trim();
+            const recordButton = document.getElementById('record-button');
+
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
+                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
+                    recordButton.disabled = false;
+                    document.getElementById('record-text').textContent = '點擊開始錄音 (含喚醒詞)';
+                    document.getElementById('status-message').textContent = '等待錄音中...';
+                    initMediaDevices(); 
+                    urlInput.style.borderColor = '#28a745';
+                    appendLog(`✅ 偵測到有效 Tunnel 網址。正在請求媒體權限...`);
+                    return true;
+                } else {
+                    throw new Error("非 HTTPS 或格式錯誤");
+                }
+            } catch (e) {
+                CURRENT_BASE_URL = null;
+                recordButton.disabled = true;
+                recordButton.classList.remove('recording');
+                document.getElementById('record-text').textContent = '請先輸入 Tunnel 網址...';
+                document.getElementById('status-message').textContent = '等待網址輸入...';
+                urlInput.style.borderColor = '#dc3545';
+                return false;
+            }
+        }
+
         async function initMediaDevices() {
             if (audioStream && videoTrack) return;
             
             try {
+                // 麥克風和鏡頭一次請求
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: true, 
                     video: { width: 640, height: 480 } 
@@ -488,72 +423,121 @@
                 document.getElementById('record-button').disabled = true;
             }
         }
-
+        
         async function handleAPIReply(result) {
-            updateState(STATE.PROCESSING); // 確保在處理狀態
+            updateState(STATE.PROCESSING); 
 
             if (result.is_wake_detected === false) {
                 appendLog(`⚠️ STT 結果為：「${result.user_text}」，但未偵測到喚醒詞「${WAKE_WORD}」。`, 'warning');
                 document.getElementById('user-text').textContent = result.user_text;
                 document.getElementById('assistant-reply').textContent = result.reply || '(喚醒失敗，未回應)';
-                await playTTSAudio(result.tts_audio_file); // 播放失敗音效
-                updateState(STATE.LISTENING); // 回到監聽
+                await playTTSAudio(result.tts_audio_file); 
+                updateState(STATE.IDLE); 
                 return;
             }
             
-            // ... (其餘 UI 更新、播放 TTS 邏輯保持不變) ...
-             
             // 更新狀態
-            conversationHistory = result.updated_history || [];
+            // conversationHistory = result.updated_history || conversationHistory; // 保持歷史紀錄
             
             document.getElementById('user-text').textContent = result.user_text;
             document.getElementById('assistant-reply').textContent = result.reply;
 
             const personalityName = getPersonalityName(result.personality);
+            const isManual = result.new_manual_personality !== null;
             
             appendLog(`📝 Whisper STT: "${result.user_text}"`);
-            appendLog(`🔍 選定【${personalityName}】人格，模式: ${result.new_manual_personality !== null ? '手動' : '自動'}`);
+            appendLog(`🔍 選定【${personalityName}】人格，模式: ${isManual ? '手動' : '自動'}`);
             
             updateUIPanels(result);
             
             await playTTSAudio(result.tts_audio_file);
 
-            updateState(STATE.LISTENING); // 播放完畢，自動回到 LISTENING (持續監聽)
-            appendLog(`\n--- 對話輪結束，自動回到喚醒監聽模式 ---`);
+            updateState(STATE.IDLE); 
+            appendLog(`\n--- 對話輪結束，回到待命模式 ---`);
         }
-        
-        function checkUrlValidity() {
-            // ... (保持不變) ...
-            const urlInput = document.getElementById('tunnel-url');
-            const url = urlInput.value.trim();
-            const recordButton = document.getElementById('record-button');
 
-            try {
-                const urlObj = new URL(url);
-                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
-                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
-                    recordButton.disabled = false;
-                    document.getElementById('record-text').textContent = '點擊開始監聽喚醒詞';
-                    document.getElementById('status-message').textContent = '等待點擊開始監聽...';
-                    initMediaDevices(); 
-                    urlInput.style.borderColor = '#28a745';
-                    appendLog(`✅ 偵測到有效 Tunnel 網址。正在請求媒體權限...`);
-                    return true;
-                } else {
-                    throw new Error("非 HTTPS 或格式錯誤");
-                }
-            } catch (e) {
-                CURRENT_BASE_URL = null;
-                recordButton.disabled = true;
-                recordButton.classList.remove('recording');
-                document.getElementById('record-text').textContent = '請先輸入 Tunnel 網址...';
-                document.getElementById('status-message').textContent = '等待網址輸入...';
-                urlInput.style.borderColor = '#dc3545';
-                return false;
+        async function playTTSAudio(filename) {
+             if (!filename) {
+                appendLog('❌ 無 TTS 音訊檔名回傳。', 'error');
+                return;
             }
+            
+            const audioPath = CURRENT_BASE_URL + API_DOWNLOAD_PATH + `?filename=${filename}`;
+            const audio = document.getElementById('tts-audio');
+            
+            appendLog(`🎶 正在下載並播放 TTS 檔案: ${filename}`);
+            document.getElementById('status-message').textContent = '助理回應中...';
+            
+            audio.src = audioPath;
+            audio.classList.remove('hidden');
+            
+            return new Promise(resolve => {
+                audio.oncanplaythrough = () => {
+                    audio.play().catch(e => {
+                        appendLog(`❌ 播放失敗: ${e.message}`, 'error');
+                        audio.classList.add('hidden');
+                        resolve();
+                    });
+                };
+                audio.onended = () => {
+                    audio.classList.add('hidden');
+                    resolve();
+                };
+                audio.onerror = (e) => {
+                    appendLog(`❌ 音訊下載/播放錯誤: 請檢查後端是否正確儲存 WAV 檔。`, 'error');
+                    audio.classList.add('hidden');
+                    resolve();
+                };
+            });
         }
         
-        // ... (playTTSAudio, updateUIPanels, appendLog, getPersonalityName, getPersonalityIcon, getEmotionZh, getTrendMessage 函數保持不變) ...
+        function updateUIPanels(result) {
+            const personalityName = getPersonalityName(result.personality);
+            const isManual = result.new_manual_personality !== null;
+
+            document.getElementById('personality-display').textContent = `${getPersonalityIcon(result.personality)} ${personalityName}`;
+            
+            const modeTag = document.getElementById('personality-mode-tag');
+            modeTag.textContent = isManual ? '手動 (Manual)' : '自動 (Auto)';
+            modeTag.className = `status-tag ${isManual ? 'manual' : 'auto'}`;
+            
+            const trend = result.emotion_trend || 'stable'; 
+            const trendTag = document.getElementById('emotion-trend-tag');
+            trendTag.textContent = getTrendMessage(trend);
+            trendTag.className = `status-tag ${trend}`;
+
+            const textEmo = result.emotion_results?.text;
+            const audioEmo = result.emotion_results?.audio;
+            const facialEmo = result.emotion_results?.facial;
+            
+            if (textEmo) {
+                document.getElementById('text-emotion').textContent = `${getEmotionZh(textEmo.emotion)} (${textEmo.emotion})`;
+                document.getElementById('text-score').textContent = `${(textEmo.score * 100).toFixed(2)}%`;
+            } else {
+                 document.getElementById('text-emotion').textContent = '--';
+                 document.getElementById('text-score').textContent = '0.00%';
+            }
+            
+            if (audioEmo) {
+                document.getElementById('audio-emotion').textContent = `${getEmotionZh(audioEmo.emotion)} (${audioEmo.emotion})`;
+                document.getElementById('audio-score').textContent = `${(audioEmo.score * 100).toFixed(2)}%`;
+            } else {
+                 document.getElementById('audio-emotion').textContent = '--';
+                 document.getElementById('audio-score').textContent = '0.00%';
+            }
+
+            if (facialEmo) {
+                document.getElementById('facial-emotion').textContent = `${getEmotionZh(facialEmo.emotion)} (${facialEmo.emotion})`;
+                document.getElementById('facial-score').textContent = `${(facialEmo.confidence * 100).toFixed(2)}%`;
+                document.getElementById('facial-frames').textContent = `${facialEmo.num_valid_frames}/${facial_frames.num_total_frames}`;
+            } else {
+                 document.getElementById('facial-emotion').textContent = '--';
+                 document.getElementById('facial-score').textContent = '0.00%';
+                 document.getElementById('facial-frames').textContent = '0/0';
+            }
+            
+            document.getElementById('assistant-emoji').textContent = getPersonalityIcon(result.personality);
+        }
         
         function appendLog(message, type = 'info') {
             const logDisplay = document.getElementById('log-display');
@@ -563,7 +547,6 @@
             let icon = 'ℹ️';
             if (message.includes('成功')) icon = '✅';
             if (message.includes('偵測到人聲')) icon = '🗣️';
-            if (message.includes('喚醒監聽')) icon = '👂';
             if (message.includes('錄音')) icon = '🎙️';
             if (message.includes('擷取')) icon = '📸';
             if (message.includes('API 回傳')) icon = '📡';
@@ -574,7 +557,8 @@
             logDisplay.scrollTop = 0;
         }
 
-        function getPersonalityName(id) { /* ... */ 
+        // 輔助函式 (不變)
+        function getPersonalityName(id) { 
              const map = {
                 "comforting": "安撫型", "cheerful": "開朗型", "humorous": "幽默型",
                 "gentle": "溫柔型", "rational": "理性型", "encouraging": "鼓勵型",
@@ -582,7 +566,7 @@
             };
             return map[id] || "未知人格";
         }
-        function getPersonalityIcon(id) { /* ... */ 
+        function getPersonalityIcon(id) { 
              const map = {
                 "comforting": "🤗", "cheerful": "😄", "humorous": "😆",
                 "gentle": "💝", "rational": "🤔", "encouraging": "💪",
@@ -590,7 +574,7 @@
             };
             return map[id] || "❓";
         }
-        function getEmotionZh(en) { /* ... */ 
+        function getEmotionZh(en) { 
              const map = {
                 "angry": "憤怒", "happiness": "快樂", "sadness": "悲傷", "neutral": "中性",
                 "fear": "恐懼", "surprise": "驚訝", "disgust": "厭惡", "joy": "喜悅",
@@ -599,7 +583,7 @@
             };
             return map[en] || en;
         }
-        function getTrendMessage(trend) { /* ... */ 
+        function getTrendMessage(trend) { 
             if (trend === 'worsening') return '惡化中 🔻';
             if (trend === 'improving') return '改善中 ⬆️';
             return '穩定 (Stable) ⏸️';
