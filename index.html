@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面 (裝置選擇版)</title>
+    <title>AI 多模2態助理 - Web 介面 (防誤觸版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -25,7 +25,7 @@
         #record-button:hover:not(:disabled) { background-color: #c82333; }
         #record-button:active:not(:disabled) { transform: scale(0.98); }
         #record-button.recording { background-color: #28a745; }
-        #record-button:disabled { opacity: 0.6; cursor: not-allowed; }
+        #record-button:disabled { opacity: 0.6; cursor: not-allowed; background-color: #6c757d !important; }
         
         /* 攝影機與波形區 */
         #camera-preview { position: relative; width: 100%; height: 200px; background-color: #333; margin-top: 10px; border-radius: 5px; overflow: hidden; }
@@ -114,7 +114,7 @@
         </div>
     </div>
 
-<script>
+    <script>
         // -----------------------------------------------------
         // 核心狀態與參數
         // -----------------------------------------------------
@@ -132,7 +132,7 @@
         let analyserNode; 
         let recordingStartTime; 
         let durationTimer; 
-        let maxDurationTimeout; // 新增：最大錄音時長計時器
+        let maxDurationTimeout;
         
         let audioChunks = []; 
         let capturedImageBlobs = []; 
@@ -140,8 +140,8 @@
         
         // VAD/錄音參數
         const SILENCE_TIMEOUT_SECONDS = 3; 
-        const MAX_RECORD_SECONDS = 15; // 新增：最長錄 15 秒強制停止
-        const VOICE_THRESHOLD = 20;    // 音量閾值 (若背景吵雜，請調高至 30 或 40)
+        const MAX_RECORD_SECONDS = 15; 
+        const VOICE_THRESHOLD = 20;    
         const FRAME_RATE = 0.5; 
         const WAKE_WORD = "嗨小白"; 
         
@@ -174,16 +174,25 @@
                     break;
                     
                 case STATE.RECORDING:
+                    // 🚨 啟動時強制禁用按鈕 2 秒 (防誤觸安全鎖)
                     button.classList.add('recording');
-                    button.disabled = false; // 🟢 修正：允許手動停止
-                    recordText.textContent = '正在錄音... 點擊強制送出';
+                    button.disabled = true; 
+                    recordText.textContent = '初始化中... (請稍候)';
+                    
+                    setTimeout(() => {
+                        if (currentState === STATE.RECORDING) {
+                            button.disabled = false; // 2秒後解鎖
+                            recordText.textContent = '正在錄音... 點擊強制送出';
+                        }
+                    }, 2000);
+
                     recordStatus.textContent = `狀態: 錄音中 (靜音 ${SILENCE_TIMEOUT_SECONDS}s 或 ${MAX_RECORD_SECONDS}s 後停止)`;
                     document.getElementById('status-message').textContent = '請說話...';
                     
                     recordingStartTime = Date.now();
                     durationTimer = setInterval(updateDuration, 1000);
                     
-                    // 🟢 新增：設定最大錄音時間強制停止
+                    // 設定最大錄音時間
                     maxDurationTimeout = setTimeout(() => {
                         if (currentState === STATE.RECORDING) {
                             appendLog(`⏰ 達到最大錄音時間 (${MAX_RECORD_SECONDS}秒)，強制停止。`);
@@ -216,9 +225,8 @@
             if (currentState === STATE.IDLE) {
                 startRecording();
             } else if (currentState === STATE.RECORDING) {
-                // 🟢 修正：允許手動點擊停止
                 appendLog('👆 使用者手動點擊停止錄音。');
-                stopRecording(false); // false 代表不是 VAD 觸發，而是手動
+                stopRecording(false); 
             }
         }
 
@@ -254,7 +262,6 @@
                  mediaRecorder.stop();
             }
             if (audioContext) {
-                 // 不要 close audioContext，否則下一次無法錄音，只需斷開連接
                  // audioContext.close(); 
             }
             
@@ -408,8 +415,6 @@
             let hasVoice = false;
             let lastActive = audioContext.currentTime;
             const detectionStartTime = audioContext.currentTime;
-            
-            // 🟢 新增：Debug 計數器，減少 Log 刷屏
             let debugCounter = 0;
 
             function loop() {
@@ -421,9 +426,8 @@
                 
                 const now = audioContext.currentTime;
 
-                // 🟢 改進：在 Log 中顯示音量，幫助除錯
                 debugCounter++;
-                if (debugCounter % 30 === 0) { // 每 0.5 秒顯示一次音量
+                if (debugCounter % 60 === 0) { // 每1秒顯示一次音量
                     console.log(`目前音量: ${max} (閾值: ${VOICE_THRESHOLD})`);
                 }
 
@@ -471,8 +475,9 @@
 
         async function uploadData() {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
-            if (audioBlob.size < 5000) { // 門檻：5KB
-                appendLog('⚠️ 錄音太短或無聲音 (Size<5KB)，取消上傳。', 'warning');
+            // 門檻降低到 2000 以避免誤判，因為開頭被我們鎖定了
+            if (audioBlob.size < 2000) { 
+                appendLog('⚠️ 錄音太短或無聲音 (Size<2KB)，取消上傳。', 'warning');
                 updateState(STATE.IDLE);
                 return;
             }
@@ -495,7 +500,7 @@
             }
         }
         
-        // ... (handleAPIReply, playTTSAudio, updateUIPanels 保持不變，省略以節省空間，請使用上一版內容) ...
+        // ... (handleAPIReply, playTTSAudio, updateUIPanels 保持不變) ...
         async function handleAPIReply(result) {
             document.getElementById('user-text').textContent = result.user_text;
             document.getElementById('assistant-reply').textContent = result.reply;
