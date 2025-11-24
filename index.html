@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面 (錄音除錯版)</title>
+    <title>AI 多模態助理 - Web 介面 (記憶增強版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -47,6 +47,10 @@
         .debug-link { display: inline-block; padding: 8px 20px; background-color: #17a2b8; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .debug-link:hover { background-color: #138496; transform: translateY(-1px); }
 
+        /* 音量數值顯示 */
+        #vol-display { font-weight: bold; color: #dc3545; margin-left: 10px; }
+        #vol-display.active { color: #28a745; }
+
         .status-tag { display: inline-block; padding: 5px 10px; border-radius: 15px; font-weight: bold; margin: 5px 0; font-size: 0.9em; }
         .status-tag.auto { background-color: #e6f7ff; color: #007bff; }
         .status-tag.manual { background-color: #fff0e6; color: #ff6600; }
@@ -58,7 +62,7 @@
 <body>
     <div class="container">
         <div class="left-panel">
-            <h1>💬 AI 多模態助理 (錄音除錯版)</h1>
+            <h1>💬 AI 多模態助理 (記憶增強版)</h1>
             
             <div class="input-group">
                 <label for="tunnel-url">🚨 Cloudflare Tunnel HTTPS 網址 (必填):</label>
@@ -79,7 +83,10 @@
                 <button id="record-button" onclick="toggleRecording()" disabled>
                     <span id="record-text">請先輸入網址並連線...</span>
                 </button>
-                <p id="record-status">狀態: 閒置中...</p>
+                <p>
+                    <span id="record-status">狀態: 閒置中...</span>
+                    <span id="vol-display">(Vol: 0)</span>
+                </p>
                 <div id="camera-preview">
                     <video id="video-stream" autoplay muted></video>
                     <canvas id="audio-visualizer"></canvas>
@@ -123,33 +130,38 @@
     </div>
 
     <script>
+        // -----------------------------------------------------
+        // 核心狀態與參數
+        // -----------------------------------------------------
         const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
         let currentState = STATE.IDLE;
+        
+        // 🟢 關鍵：網頁載入時產生一次 ID，之後一直用它 (解決失憶問題)
+        const currentSessionId = Date.now().toString(); 
+
         let mediaRecorder; let audioStream; let videoTrack; let audioContext; let analyserNode; 
         let recordingStartTime; let durationTimer; let maxDurationTimeout;
         let audioChunks = []; let capturedImageBlobs = []; let captureInterval;
         let ignoreClicksUntil = 0;
 
-        // -----------------------------------------------------
-        // 核心狀態與參數
-        // -----------------------------------------------------
-        const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
-        
-        // 🟢 新增這行：網頁載入時產生一次 ID，之後一直用它
-        const currentSessionId = Date.now().toString(); 
-
-        let currentState = STATE.IDLE;
-        // 參數設定
-        const LOCK_SECONDS = 3; // 強制錄音最少 3 秒
+        // VAD/錄音參數
+        const LOCK_SECONDS = 3; 
         const SILENCE_TIMEOUT_SECONDS = 3; 
         const MAX_RECORD_SECONDS = 15; 
+        
+        // 🔴 靈敏度設定：設為 2 (超靈敏)
         const VOICE_THRESHOLD = 2;    
+        
         const FRAME_RATE = 0.5; 
         const WAKE_WORD = "嗨小白"; 
         
         let CURRENT_BASE_URL = null;
         const API_PROCESS_PATH = "/api/v1/process"; 
         const API_DOWNLOAD_PATH = "/api/v1/audio-download";
+
+        // ------------------------------------------------------------------
+        // 狀態機與主要控制
+        // ------------------------------------------------------------------
 
         function manualConnect() { checkUrlValidity(); }
 
@@ -169,6 +181,7 @@
                     recordStatus.textContent = '狀態: 閒置中...';
                     document.getElementById('status-message').textContent = '等待錄音中...';
                     document.getElementById('duration-display').textContent = '00:00'; 
+                    document.getElementById('vol-display').textContent = '(Vol: 0)';
                     clearInterval(durationTimer);
                     clearTimeout(maxDurationTimeout);
                     break;
@@ -266,32 +279,34 @@
         async function uploadData() {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
             
-            // 🎤 生成除錯下載連結 (關鍵步驟)
+            // 除錯下載連結
             const audioUrl = URL.createObjectURL(audioBlob);
             const downloadLink = document.createElement('a');
             downloadLink.href = audioUrl;
             downloadLink.download = `debug_audio_${Date.now()}.webm`;
-            downloadLink.textContent = `📥 下載剛剛的錄音檔 (Size: ${(audioBlob.size/1024).toFixed(1)}KB)`;
+            downloadLink.textContent = `📥 下載錄音檔 (Size: ${(audioBlob.size/1024).toFixed(1)}KB)`;
             downloadLink.className = 'debug-link';
             document.getElementById('debug-link-container').appendChild(downloadLink);
-            appendLog(`🔊 已生成錄音檔連結，請點擊下方藍色按鈕下載測試。`);
-            
-            const turnData = {
-                session_id: currentSessionId,  // 🟢 修改：使用固定的全域變數
-                history: [], 
-                current_personality: null,
-                wake_word: WAKE_WORD 
-            };
-            formData.append('turn_data', JSON.stringify(turnData));
-            // 暫時降低門檻以便測試
+
+            // 門檻檢查 (放寬到 1KB)
             if (audioBlob.size < 1000) {
-                appendLog('⚠️ 錄音極短 (Size<1KB)，可能無聲音。', 'warning');
+                appendLog('⚠️ 錄音極短 (Size<1KB)，取消上傳。', 'warning');
+                updateState(STATE.IDLE);
+                return;
             }
             
             const formData = new FormData();
             formData.append('audio_file', audioBlob, `audio_${Date.now()}.webm`); 
             capturedImageBlobs.forEach((b, i) => formData.append(`image_${i}`, b, `frame_${i}.jpg`));
-            formData.append('turn_data', JSON.stringify({ session_id: Date.now().toString(), history: [], wake_word: WAKE_WORD }));
+            
+            // 🟢 關鍵：傳送固定的 session_id
+            const turnData = {
+                session_id: currentSessionId, 
+                history: [], 
+                current_personality: null,
+                wake_word: WAKE_WORD
+            };
+            formData.append('turn_data', JSON.stringify(turnData));
             
             appendLog(`📦 打包完成，上傳中...`);
             
@@ -305,6 +320,10 @@
                 updateState(STATE.IDLE);
             }
         }
+        
+        // ------------------------------------------------------------------
+        // 裝置選擇與 VAD
+        // ------------------------------------------------------------------
         
         async function getAudioDevices() {
             const select = document.getElementById('mic-select');
@@ -419,49 +438,40 @@
             draw();
         }
 
-// 修改 index.html 中的 detectSilence 函數
         function detectSilence() {
             if (!analyserNode) return;
             visualizeAudio(); 
-            
             const bufferLength = analyserNode.fftSize;
             const buffer = new Uint8Array(bufferLength);
             let hasVoice = false;
             let lastActive = audioContext.currentTime;
             const detectionStartTime = audioContext.currentTime;
-            
-            // 用來控制 Log 頻率
             let debugCounter = 0;
-
+            
             function loop() {
                 if (currentState !== STATE.RECORDING) return;
-                
                 analyserNode.getByteTimeDomainData(buffer);
                 let max = 0;
-                // 計算當前幀的最大振幅 (0~128)
-                for (let i = 0; i < buffer.length; i++) {
-                    max = Math.max(max, Math.abs(buffer[i] - 128)); 
-                }
-                
+                for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
                 const now = audioContext.currentTime;
 
-                // 🛑 除錯關鍵：每 0.5 秒印出一次目前音量
-                debugCounter++;
-                if (debugCounter % 30 === 0) {
-                    console.log(`🔊 目前音量: ${max} | 觸發閾值: ${VOICE_THRESHOLD} | 狀態: ${max > VOICE_THRESHOLD ? '🗣️ 有聲音' : '🔇 靜音'}`);
+                // 音量數值顯示與狀態更新
+                const volDisplay = document.getElementById('vol-display');
+                if (debugCounter++ % 10 === 0) { // 稍微降低更新頻率
+                    volDisplay.textContent = `(Vol: ${max})`;
+                    if (max > VOICE_THRESHOLD) volDisplay.classList.add('active');
+                    else volDisplay.classList.remove('active');
                 }
 
                 if (max > VOICE_THRESHOLD) { 
-                    // 只有當音量真的大於閾值時，才更新「最後活動時間」
-                    if (!hasVoice) appendLog(`🗣️ 偵測到人聲 (Vol:${max})`);
+                    if (!hasVoice) appendLog(`🗣️ 偵測到聲音 (Vol:${max})`);
                     hasVoice = true;
                     lastActive = now;
                 }
                 
-                // 靜音超時判斷
+                // 安全期 3 秒 + 靜音超時
                 if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
-                    // 安全期：錄音至少要跑 2 秒才允許自動停止 (避免剛點擊就斷)
-                    if ((now - detectionStartTime) > 2.0) { 
+                    if ((now - detectionStartTime) > LOCK_SECONDS) { 
                         stopRecording(true);
                         return;
                     }
@@ -470,6 +480,7 @@
             }
             requestAnimationFrame(loop);
         }
+
         function updateDuration() {
             const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
             document.getElementById('duration-display').textContent = 
@@ -518,6 +529,11 @@
              document.getElementById('personality-display').textContent = `${mapE[result.personality]||'❓'} ${pName}`;
              document.getElementById('personality-mode-tag').textContent = result.new_manual_personality ? '手動' : '自動';
              document.getElementById('assistant-emoji').textContent = mapE[result.personality]||'❓';
+             
+             const trendTag = document.getElementById('emotion-trend-tag');
+             trendTag.textContent = getTrendMessage(result.emotion_trend);
+             trendTag.className = `status-tag ${result.emotion_trend || 'stable'}`;
+
              if(result.emotion_results?.text) {
                  const e = result.emotion_results.text;
                  document.getElementById('text-emotion').textContent = `${e.emotion}`;
@@ -532,6 +548,7 @@
                  const e = result.emotion_results.facial;
                  document.getElementById('facial-emotion').textContent = `${e.emotion}`;
                  document.getElementById('facial-score').textContent = `${(e.confidence*100).toFixed(1)}%`;
+                 document.getElementById('facial-frames').textContent = `${e.num_valid_frames}/${e.num_total_frames}`;
              }
         }
 
@@ -540,6 +557,12 @@
             div.className = 'log-item';
             div.innerHTML = msg;
             document.getElementById('log-display').prepend(div);
+        }
+
+        function getTrendMessage(trend) { 
+            if (trend === 'worsening') return '惡化中 🔻';
+            if (trend === 'improving') return '改善中 ⬆️';
+            return '穩定 (Stable) ⏸️';
         }
 
         document.addEventListener('DOMContentLoaded', () => {
