@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態情緒助理</title>
+    <title>AI 多模態情緒助理1 )</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -12,11 +12,12 @@
         h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; }
         h2 { color: #007bff; margin-top: 20px; }
         
-        /* 計算過程顯示區 (新) */
+        /* 計算過程顯示區 */
         .calc-box { 
             background-color: #2d2d2d; color: #00ff00; 
             padding: 10px; border-radius: 5px; font-family: 'Consolas', monospace; 
             font-size: 0.9em; margin-bottom: 15px; text-align: left; white-space: pre-wrap;
+            max-height: 150px; overflow-y: auto;
         }
 
         .emotion-box { padding: 15px; border: 1px solid #ced4da; border-radius: 8px; margin-bottom: 15px; }
@@ -40,10 +41,11 @@
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
         .input-group input, .input-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         .url-container { display: flex; gap: 10px; }
-        #connect-btn { padding: 8px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
-
+        #connect-btn { padding: 8px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+        
         #debug-link-container { margin-top: 15px; min-height: 30px; }
         .debug-link { display: inline-block; padding: 8px 20px; background-color: #17a2b8; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
+        
         #vol-display { font-weight: bold; color: #dc3545; margin-left: 10px; }
         #vol-display.active { color: #28a745; }
 
@@ -61,7 +63,8 @@
 <body>
     <div class="container">
         <div class="left-panel">
-            <h1>💬 AI 多模態情緒助理 </h1>
+            <h1>💬 AI 多模態情緒助理1</h1>
+            
             <div class="input-group">
                 <label for="tunnel-url">🚨 Cloudflare Tunnel HTTPS 網址 (必填):</label>
                 <div class="url-container">
@@ -69,12 +72,14 @@
                     <button id="connect-btn" onclick="manualConnect()">確認連線</button>
                 </div>
             </div>
+
             <div class="input-group">
                 <label for="mic-select">🎤 選擇麥克風裝置:</label>
                 <select id="mic-select" onchange="changeAudioInput()">
                     <option value="" disabled selected>請先點擊「確認連線」...</option>
                 </select>
             </div>
+
             <div class="record-control">
                 <button id="record-button" onclick="toggleRecording()" disabled>
                     <span id="record-text">請先輸入網址並連線...</span>
@@ -110,6 +115,7 @@
                 <audio id="tts-audio" controls class="hidden"></audio>
             </div>
         </div>
+        
         <div class="right-panel">
             <h1>🎭 助理表情</h1>
             <div id="status-message" class="main-status">等待連線...</div>
@@ -125,23 +131,105 @@
         const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
         let currentState = STATE.IDLE;
         const currentSessionId = Date.now().toString(); 
+
         let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode, recordingStartTime, durationTimer, maxDurationTimeout;
         let audioChunks = [], capturedImageBlobs = [], captureInterval, ignoreClicksUntil = 0;
 
         const LOCK_SECONDS = 3; 
         const SILENCE_TIMEOUT_SECONDS = 3; 
         const MAX_RECORD_SECONDS = 15; 
-        const NO_SPEECH_TIMEOUT = 5; // 🟢 5秒沒聲音自動斷
+        const NO_SPEECH_TIMEOUT = 5;
         
-        // 🔴 閾值設為 2 (針對您的 Vol 1 底噪)
         const VOICE_THRESHOLD = 2;    
         const FRAME_RATE = 0.5; 
         const WAKE_WORD = "嗨小白"; 
+        
         let CURRENT_BASE_URL = null;
         const API_PROCESS_PATH = "/api/v1/process"; 
         const API_DOWNLOAD_PATH = "/api/v1/audio-download";
 
+        // ===== 1. 連線與裝置 =====
         function manualConnect() { checkUrlValidity(); }
+
+        function checkUrlValidity() {
+            const urlInput = document.getElementById('tunnel-url');
+            const url = urlInput.value.trim();
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
+                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
+                    urlInput.style.borderColor = '#28a745';
+                    appendLog(`✅ 網址有效。請求權限...`);
+                    // 請求權限後列出裝置
+                    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                        .then(s => { s.getTracks().forEach(t => t.stop()); getAudioDevices(); })
+                        .catch(e => appendLog(`❌ 需權限: ${e.message}`, 'error'));
+                    
+                    // 嘗試載入預設圖片測試連線
+                    loadRemoteImage('humorous');
+                    return true;
+                } else throw new Error();
+            } catch (e) {
+                CURRENT_BASE_URL = null;
+                document.getElementById('record-button').disabled = true;
+                urlInput.style.borderColor = '#dc3545';
+                appendLog(`❌ 網址無效 (需 https + trycloudflare.com)`, 'error');
+                return false;
+            }
+        }
+
+        async function getAudioDevices() {
+            const select = document.getElementById('mic-select');
+            select.innerHTML = '<option value="" disabled>正在掃描裝置...</option>';
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+                select.innerHTML = ''; 
+                if (audioInputs.length === 0) {
+                    const option = document.createElement('option'); option.text = "未偵測到麥克風"; select.add(option); return;
+                }
+                audioInputs.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `麥克風 ${select.length + 1}`;
+                    select.add(option);
+                });
+                if (audioInputs.length > 0) {
+                    select.value = audioInputs[0].deviceId;
+                    initMediaDevices(audioInputs[0].deviceId);
+                }
+                appendLog(`🎤 發現 ${audioInputs.length} 個麥克風。`);
+            } catch (e) {
+                appendLog(`⚠️ 無法列舉裝置: ${e.message}`, 'error');
+            }
+        }
+
+        async function changeAudioInput() {
+            const deviceId = document.getElementById('mic-select').value;
+            if (deviceId) {
+                appendLog(`🔄 切換麥克風...`);
+                await initMediaDevices(deviceId);
+            }
+        }
+
+        async function initMediaDevices(deviceId = null) {
+            if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+            const constraints = {
+                audio: { deviceId: deviceId ? { exact: deviceId } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+                video: { width: 640, height: 480 }
+            };
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                audioStream = stream;
+                document.getElementById('video-stream').srcObject = stream;
+                videoTrack = stream.getVideoTracks()[0];
+                appendLog(`✅ 媒體裝置就緒。`);
+                document.getElementById('record-button').disabled = false;
+                document.getElementById('record-text').textContent = '點擊開始錄音 (VAD 自動停止)';
+            } catch (err) {
+                appendLog(`❌ 媒體失敗: ${err.message}`, 'error');
+            }
+        }
 
         function loadRemoteImage(personalityKey = 'humorous') {
             if (!CURRENT_BASE_URL) return;
@@ -154,10 +242,25 @@
                     avatar.onerror = function() { 
                         this.onerror = null; 
                         this.src = `${CURRENT_BASE_URL}/static/image/humorous.png`; 
-                        appendLog(`⚠️ 找不到圖片 ${personalityKey}.png`, 'warning');
+                        appendLog(`⚠️ 找不到圖片 ${personalityKey}.png，載入預設圖。`, 'warning');
                     };
                     avatar.onload = function() { avatar.style.opacity = 1; }
                 }, 200);
+            }
+        }
+
+        // ===== 2. 錄音控制 =====
+        function toggleRecording() {
+            if (!CURRENT_BASE_URL) { appendLog('⚠️ 請先連線。', 'error'); return; }
+            if (!audioStream) { appendLog('⚠️ 媒體未就緒。', 'error'); return; }
+            if (Date.now() < ignoreClicksUntil) return; 
+            
+            if (currentState === STATE.IDLE) {
+                ignoreClicksUntil = Date.now() + (LOCK_SECONDS * 1000);
+                startRecording();
+            } else if (currentState === STATE.RECORDING) {
+                appendLog('👆 手動停止錄音。');
+                stopRecording(false); 
             }
         }
 
@@ -216,19 +319,6 @@
             }
         }
 
-        function toggleRecording() {
-            if (!CURRENT_BASE_URL) { appendLog('⚠️ 請先連線。', 'error'); return; }
-            if (!audioStream) { appendLog('⚠️ 媒體未就緒。', 'error'); return; }
-            if (Date.now() < ignoreClicksUntil) return; 
-            if (currentState === STATE.IDLE) {
-                ignoreClicksUntil = Date.now() + (LOCK_SECONDS * 1000);
-                startRecording();
-            } else if (currentState === STATE.RECORDING) {
-                appendLog('👆 手動停止錄音。');
-                stopRecording(false); 
-            }
-        }
-
         async function startRecording() {
             if (currentState !== STATE.IDLE) return;
             updateState(STATE.RECORDING);
@@ -257,9 +347,118 @@
             appendLog(isSilentStop ? `🛑 VAD 靜音結束。` : `🛑 錄音結束。`);
             updateState(STATE.PROCESSING); 
         }
+
+        // ===== 3. VAD 邏輯 =====
+        function setupAudioAnalysis(stream) {
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') audioContext.resume();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyserNode = audioContext.createAnalyser(); 
+            analyserNode.fftSize = 2048; 
+            source.connect(analyserNode);
+        }
+
+        function visualizeAudio() {
+            const canvas = document.getElementById('audio-visualizer');
+            const ctx = canvas.getContext('2d');
+            const WIDTH = canvas.width = canvas.clientWidth;
+            const HEIGHT = canvas.height = canvas.clientHeight;
+            if (!analyserNode) return;
+            const bufferLength = analyserNode.fftSize;
+            const dataArray = new Uint8Array(bufferLength);
+            function draw() {
+                if (currentState !== STATE.RECORDING) return;
+                requestAnimationFrame(draw);
+                analyserNode.getByteTimeDomainData(dataArray);
+                ctx.clearRect(0, 0, WIDTH, HEIGHT);
+                ctx.lineWidth = 2; ctx.strokeStyle = 'rgb(0, 255, 0)'; ctx.beginPath();
+                const sliceWidth = WIDTH * 1.0 / bufferLength;
+                let x = 0;
+                for(let i = 0; i < bufferLength; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = v * HEIGHT/2;
+                    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    x += sliceWidth;
+                }
+                ctx.lineTo(WIDTH, HEIGHT/2);
+                ctx.stroke();
+            }
+            draw();
+        }
+
+        function detectSilence() {
+            if (!analyserNode) return;
+            visualizeAudio(); 
+            const bufferLength = analyserNode.fftSize;
+            const buffer = new Uint8Array(bufferLength);
+            let hasVoice = false;
+            let lastActive = audioContext.currentTime;
+            const detectionStartTime = audioContext.currentTime;
+            let debugCounter = 0;
+            
+            function loop() {
+                if (currentState !== STATE.RECORDING) return;
+                analyserNode.getByteTimeDomainData(buffer);
+                let max = 0;
+                for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
+                const now = audioContext.currentTime;
+                
+                // 更新音量顯示
+                const volDisplay = document.getElementById('vol-display');
+                if (debugCounter++ % 10 === 0) { 
+                    volDisplay.textContent = `(Vol: ${max})`;
+                    if (max > VOICE_THRESHOLD) volDisplay.classList.add('active');
+                    else volDisplay.classList.remove('active');
+                }
+                
+                if (max > VOICE_THRESHOLD) { 
+                    if (!hasVoice) appendLog(`🗣️ 偵測到聲音 (Vol:${max})`);
+                    hasVoice = true;
+                    lastActive = now;
+                }
+                
+                // VAD 超時
+                if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
+                    if ((now - detectionStartTime) > LOCK_SECONDS) { 
+                        stopRecording(true); return;
+                    }
+                }
+                
+                // 起始無聲超時
+                if (!hasVoice && (now - detectionStartTime) > NO_SPEECH_TIMEOUT) {
+                    appendLog(`🛑 逾時未偵測到聲音 (${NO_SPEECH_TIMEOUT}s)，自動結束。`);
+                    stopRecording(false); return;
+                }
+                
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+        }
         
+        function updateDuration() {
+            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+            document.getElementById('duration-display').textContent = 
+                `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
+        }
+
+        // ===== 4. 拍照與上傳 =====
+        function startFaceCapture() {
+            capturedImageBlobs = [];
+            captureInterval = setInterval(() => {
+                if (!videoTrack) return;
+                const canvas = document.createElement('canvas');
+                canvas.width = videoTrack.getSettings().width || 640;
+                canvas.height = videoTrack.getSettings().height || 480;
+                canvas.getContext('2d').drawImage(document.getElementById('video-stream'), 0, 0);
+                canvas.toBlob(b => { if(b) capturedImageBlobs.push(b); }, 'image/jpeg', 0.8);
+            }, 1000 / FRAME_RATE);
+        }
+        function stopFaceCapture() { clearInterval(captureInterval); }
+
         async function uploadData() {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
+            
+            // 下載連結
             const audioUrl = URL.createObjectURL(audioBlob);
             const downloadLink = document.createElement('a');
             downloadLink.href = audioUrl; downloadLink.download = `debug_${Date.now()}.webm`;
@@ -276,6 +475,7 @@
             formData.append('audio_file', audioBlob, `audio_${Date.now()}.webm`); 
             capturedImageBlobs.forEach((b, i) => formData.append(`image_${i}`, b, `frame_${i}.jpg`));
             formData.append('turn_data', JSON.stringify({ session_id: currentSessionId, history: [], wake_word: WAKE_WORD }));
+            
             appendLog(`📦 打包完成，上傳中...`);
             try {
                 const res = await fetch(CURRENT_BASE_URL + API_PROCESS_PATH, { method: 'POST', body: formData });
@@ -286,7 +486,8 @@
                 updateState(STATE.IDLE);
             }
         }
-        
+
+        // ===== 5. 回應處理與 UI =====
         async function handleAPIReply(result) {
             document.getElementById('user-text').textContent = result.user_text;
             document.getElementById('assistant-reply').textContent = result.reply;
@@ -317,7 +518,6 @@
              const pName = mapP[result.personality] || "未知";
              document.getElementById('personality-display').textContent = `${mapE[result.personality]||'❓'} ${pName}`;
              document.getElementById('personality-mode-tag').textContent = result.new_manual_personality ? '手動' : '自動';
-             document.getElementById('assistant-emoji').textContent = mapE[result.personality]||'❓';
              
              const trendTag = document.getElementById('emotion-trend-tag');
              trendTag.textContent = getTrendMessage(result.emotion_trend);
@@ -326,7 +526,6 @@
              else if (result.emotion_trend === 'improving' || result.emotion_trend === 'persistent_improving') cssClass = 'improving'; 
              trendTag.className = `status-tag ${cssClass}`;
 
-             // 🟢 顯示計算日誌
              if (result.calculation_logs) {
                  document.getElementById('calc-display').textContent = result.calculation_logs.join('\n');
              }
@@ -362,53 +561,11 @@
             div.className = 'log-item'; div.innerHTML = msg;
             document.getElementById('log-display').prepend(div);
         }
-        
-        // 輔助函數省略 (checkUrlValidity, getAudioDevices, changeAudioInput, initMediaDevices, setupAudioAnalysis, visualizeAudio, startFaceCapture, stopFaceCapture 同前)
-        // 🟢 修正 detectSilence 邏輯
-        function detectSilence() {
-            if (!analyserNode) return;
-            visualizeAudio(); 
-            const bufferLength = analyserNode.fftSize;
-            const buffer = new Uint8Array(bufferLength);
-            let hasVoice = false;
-            let lastActive = audioContext.currentTime;
-            const detectionStartTime = audioContext.currentTime;
-            let debugCounter = 0;
-            
-            function loop() {
-                if (currentState !== STATE.RECORDING) return;
-                analyserNode.getByteTimeDomainData(buffer);
-                let max = 0;
-                for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
-                const now = audioContext.currentTime;
-                const volDisplay = document.getElementById('vol-display');
-                if (debugCounter++ % 10 === 0) { 
-                    volDisplay.textContent = `(Vol: ${max})`;
-                    if (max > VOICE_THRESHOLD) volDisplay.classList.add('active');
-                    else volDisplay.classList.remove('active');
-                }
-                if (max > VOICE_THRESHOLD) { 
-                    if (!hasVoice) appendLog(`🗣️ 偵測到聲音 (Vol:${max})`);
-                    hasVoice = true;
-                    lastActive = now;
-                }
-                // VAD 超時
-                if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
-                    if ((now - detectionStartTime) > LOCK_SECONDS) { 
-                        stopRecording(true); return;
-                    }
-                }
-                // 🟢 新增：起始無聲超時 (5秒沒講話就掛斷)
-                if (!hasVoice && (now - detectionStartTime) > NO_SPEECH_TIMEOUT) {
-                    appendLog(`🛑 逾時未偵測到聲音 (${NO_SPEECH_TIMEOUT}s)，自動結束。`);
-                    stopRecording(false); return;
-                }
-                requestAnimationFrame(loop);
-            }
-            requestAnimationFrame(loop);
-        }
-        
-        // 請確保把所有輔助函數補齊 (為節省篇幅省略，請從上一版複製)
+
+        document.addEventListener('DOMContentLoaded', () => {
+             document.getElementById('record-button').addEventListener('click', toggleRecording);
+             checkUrlValidity();
+        });
     </script>
 </body>
 </html>
