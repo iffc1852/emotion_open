@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> 多模態情感助理 - Web 介面</title>
+    <title>AI 多模態助理 - Web 介面 </title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -55,7 +55,7 @@
         .status-tag.improving { background-color: #e6ffe6; color: #28a745; }
         .hidden { display: none; }
         
-        /* 說話動畫 (讓圖片跳動) */
+        /* 說話動畫 */
         @keyframes speak-pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
@@ -70,7 +70,7 @@
 <body>
     <div class="container">
         <div class="left-panel">
-            <h1>💬 AI 多模態助理 (圖像版)</h1>
+            <h1>💬 AI 多模態助理</h1>
             
             <div class="input-group">
                 <label for="tunnel-url">🚨 Cloudflare Tunnel HTTPS 網址 (必填):</label>
@@ -131,9 +131,9 @@
             
             <div id="avatar-container" style="display: flex; justify-content: center; align-items: center; height: 300px; margin-top: 20px;">
                 <img id="assistant-avatar" 
-                     src="static/image/humorous.png" 
+                     src="" 
                      alt="AI Avatar"
-                     style="max-width: 100%; max-height: 100%; object-fit: contain; transition: opacity 0.5s ease;">
+                     style="max-width: 100%; max-height: 100%; object-fit: contain; transition: opacity 0.5s ease; opacity: 0;">
             </div>
 
             <h2>📜 執行 Log</h2>
@@ -149,7 +149,6 @@
         // -----------------------------------------------------
         const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
         let currentState = STATE.IDLE;
-        
         const currentSessionId = Date.now().toString(); 
 
         let mediaRecorder; let audioStream; let videoTrack; let audioContext; let analyserNode; 
@@ -160,7 +159,7 @@
         const LOCK_SECONDS = 3; 
         const SILENCE_TIMEOUT_SECONDS = 3; 
         const MAX_RECORD_SECONDS = 15; 
-        const VOICE_THRESHOLD = 2;    
+        const VOICE_THRESHOLD = 4;    
         const FRAME_RATE = 0.5; 
         const WAKE_WORD = "嗨小白"; 
         
@@ -168,42 +167,70 @@
         const API_PROCESS_PATH = "/api/v1/process"; 
         const API_DOWNLOAD_PATH = "/api/v1/audio-download";
 
+        // ------------------------------------------------------------------
+        // 連線與圖片載入 (新增邏輯)
+        // ------------------------------------------------------------------
+
         function manualConnect() { checkUrlValidity(); }
 
+        function loadRemoteImage(personalityKey = 'humorous') {
+            if (!CURRENT_BASE_URL) return;
+            
+            const avatar = document.getElementById('assistant-avatar');
+            // 🟢 關鍵：使用 Tunnel URL 來載入本地圖片
+            const newSrc = `${CURRENT_BASE_URL}/static/image/${personalityKey}.png`; 
+            
+            // 只有當圖片真的改變時才重載
+            if (!avatar.src.includes(newSrc)) {
+                avatar.style.opacity = 0;
+                setTimeout(() => {
+                    avatar.src = newSrc;
+                    
+                    avatar.onerror = function() { 
+                        this.onerror = null; // 防止無限迴圈
+                        // 如果指定的圖片找不到，試著載入預設的 humorous
+                        if (personalityKey !== 'humorous') {
+                             appendLog(`⚠️ 找不到圖片 ${personalityKey}.png，嘗試載入預設圖。`, 'warning');
+                             this.src = `${CURRENT_BASE_URL}/static/image/humorous.png`; 
+                        } else {
+                             appendLog(`❌ 連預設圖 humorous.png 都找不到，請檢查後端 static/image 資料夾。`, 'error');
+                        }
+                    };
+                    
+                    avatar.onload = function() { 
+                        avatar.style.opacity = 1; 
+                    }
+                }, 200);
+            }
+        }
+
+        // ... (updateState, toggleRecording, startRecording, stopRecording 等函數保持不變) ...
         function updateState(newState) {
             currentState = newState;
             const button = document.getElementById('record-button');
             const recordText = document.getElementById('record-text');
             const recordStatus = document.getElementById('record-status');
-            
             appendLog(`[狀態切換] 進入 ${newState} 模式...`);
-
             switch (newState) {
                 case STATE.IDLE:
-                    button.disabled = false;
-                    button.classList.remove('recording');
+                    button.disabled = false; button.classList.remove('recording');
                     recordText.textContent = '點擊開始錄音 (安全鎖 3秒)';
                     recordStatus.textContent = '狀態: 閒置中...';
                     document.getElementById('status-message').textContent = '等待錄音中...';
                     document.getElementById('duration-display').textContent = '00:00'; 
                     document.getElementById('vol-display').textContent = '(Vol: 0)';
-                    clearInterval(durationTimer);
-                    clearTimeout(maxDurationTimeout);
+                    clearInterval(durationTimer); clearTimeout(maxDurationTimeout);
                     break;
-                    
                 case STATE.RECORDING:
                     button.classList.add('recording');
                     document.getElementById('debug-link-container').innerHTML = '';
-                    
                     let countdown = LOCK_SECONDS;
                     recordText.textContent = `啟動中... 鎖定 ${countdown} 秒`;
                     button.disabled = true; 
-
                     const lockTimer = setInterval(() => {
                         countdown--;
-                        if (countdown > 0) {
-                            recordText.textContent = `啟動中... 鎖定 ${countdown} 秒`;
-                        } else {
+                        if (countdown > 0) recordText.textContent = `啟動中... 鎖定 ${countdown} 秒`;
+                        else {
                             clearInterval(lockTimer);
                             if (currentState === STATE.RECORDING) {
                                 button.disabled = false; 
@@ -211,7 +238,6 @@
                             }
                         }
                     }, 1000);
-
                     recordStatus.textContent = `狀態: 錄音中 (靜音 ${SILENCE_TIMEOUT_SECONDS}s 自動停止)`;
                     document.getElementById('status-message').textContent = '請說話...';
                     recordingStartTime = Date.now();
@@ -223,14 +249,12 @@
                         }
                     }, MAX_RECORD_SECONDS * 1000);
                     break;
-                    
                 case STATE.PROCESSING:
                     button.disabled = true;
                     recordText.textContent = '運算中... 請稍候';
                     recordStatus.textContent = '狀態: 數據處理中...';
                     document.getElementById('status-message').textContent = 'AI 運算中...';
-                    clearInterval(durationTimer);
-                    clearTimeout(maxDurationTimeout);
+                    clearInterval(durationTimer); clearTimeout(maxDurationTimeout);
                     break;
             }
         }
@@ -239,7 +263,6 @@
             if (!CURRENT_BASE_URL) { appendLog('⚠️ 請先連線。', 'error'); return; }
             if (!audioStream) { appendLog('⚠️ 媒體未就緒。', 'error'); return; }
             if (Date.now() < ignoreClicksUntil) return; 
-
             if (currentState === STATE.IDLE) {
                 ignoreClicksUntil = Date.now() + (LOCK_SECONDS * 1000);
                 startRecording();
@@ -315,6 +338,35 @@
             }
         }
         
+        // ... (其他輔助函數) ...
+
+        function checkUrlValidity() {
+            const urlInput = document.getElementById('tunnel-url');
+            const url = urlInput.value.trim();
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
+                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
+                    urlInput.style.borderColor = '#28a745';
+                    appendLog(`✅ 網址有效。`);
+                    
+                    // 🟢 連線成功後，嘗試載入預設圖片 (這會測試圖片路徑是否通)
+                    loadRemoteImage('humorous');
+
+                    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                        .then(s => { s.getTracks().forEach(t => t.stop()); getAudioDevices(); })
+                        .catch(e => appendLog(`❌ 需權限: ${e.message}`, 'error'));
+                    return true;
+                } else throw new Error();
+            } catch (e) {
+                CURRENT_BASE_URL = null;
+                document.getElementById('record-button').disabled = true;
+                urlInput.style.borderColor = '#dc3545';
+                return false;
+            }
+        }
+
+        // ... (Audio Device, VAD, Capture functions 同上) ...
         async function getAudioDevices() {
             const select = document.getElementById('mic-select');
             select.innerHTML = '<option value="" disabled>正在掃描裝置...</option>';
@@ -340,7 +392,6 @@
                 appendLog(`⚠️ 無法列舉裝置: ${e.message}`, 'error');
             }
         }
-
         async function changeAudioInput() {
             const deviceId = document.getElementById('mic-select').value;
             if (deviceId) {
@@ -348,7 +399,6 @@
                 await initMediaDevices(deviceId);
             }
         }
-
         async function initMediaDevices(deviceId = null) {
             if (audioStream) audioStream.getTracks().forEach(track => track.stop());
             const constraints = {
@@ -366,29 +416,6 @@
                 appendLog(`❌ 媒體失敗: ${err.message}`, 'error');
             }
         }
-
-        function checkUrlValidity() {
-            const urlInput = document.getElementById('tunnel-url');
-            const url = urlInput.value.trim();
-            try {
-                const urlObj = new URL(url);
-                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
-                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
-                    urlInput.style.borderColor = '#28a745';
-                    appendLog(`✅ 網址有效。`);
-                    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-                        .then(s => { s.getTracks().forEach(t => t.stop()); getAudioDevices(); })
-                        .catch(e => appendLog(`❌ 需權限: ${e.message}`, 'error'));
-                    return true;
-                } else throw new Error();
-            } catch (e) {
-                CURRENT_BASE_URL = null;
-                document.getElementById('record-button').disabled = true;
-                urlInput.style.borderColor = '#dc3545';
-                return false;
-            }
-        }
-
         function setupAudioAnalysis(stream) {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             if (audioContext.state === 'suspended') audioContext.resume();
@@ -397,7 +424,6 @@
             analyserNode.fftSize = 2048; 
             source.connect(analyserNode);
         }
-
         function visualizeAudio() {
             const canvas = document.getElementById('audio-visualizer');
             const ctx = canvas.getContext('2d');
@@ -427,7 +453,6 @@
             }
             draw();
         }
-
         function detectSilence() {
             if (!analyserNode) return;
             visualizeAudio(); 
@@ -437,21 +462,18 @@
             let lastActive = audioContext.currentTime;
             const detectionStartTime = audioContext.currentTime;
             let debugCounter = 0;
-            
             function loop() {
                 if (currentState !== STATE.RECORDING) return;
                 analyserNode.getByteTimeDomainData(buffer);
                 let max = 0;
                 for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
                 const now = audioContext.currentTime;
-
                 const volDisplay = document.getElementById('vol-display');
                 if (debugCounter++ % 10 === 0) { 
                     volDisplay.textContent = `(Vol: ${max})`;
                     if (max > VOICE_THRESHOLD) volDisplay.classList.add('active');
                     else volDisplay.classList.remove('active');
                 }
-
                 if (max > VOICE_THRESHOLD) { 
                     if (!hasVoice) appendLog(`🗣️ 偵測到聲音 (Vol:${max})`);
                     hasVoice = true;
@@ -467,13 +489,11 @@
             }
             requestAnimationFrame(loop);
         }
-
         function updateDuration() {
             const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
             document.getElementById('duration-display').textContent = 
                 `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
         }
-        
         function startFaceCapture() {
             capturedImageBlobs = [];
             captureInterval = setInterval(() => {
@@ -500,22 +520,14 @@
         async function playTTSAudio(filename) {
             if (!filename) return;
             const audio = document.getElementById('tts-audio');
-            const avatar = document.getElementById('assistant-avatar'); // 取得圖片元素
+            const avatar = document.getElementById('assistant-avatar');
 
             audio.src = CURRENT_BASE_URL + API_DOWNLOAD_PATH + `?filename=${filename}`;
             audio.classList.remove('hidden');
             return new Promise(resolve => {
-                // 🟢 播放開始：加入 speaking class (開始跳動)
-                audio.onplay = () => {
-                    avatar.classList.add('speaking');
-                };
-
-                // 🔴 播放結束/錯誤：移除 speaking class (停止跳動)
-                const finish = () => {
-                    avatar.classList.remove('speaking');
-                    resolve();
-                };
-
+                // 🟢 說話動畫
+                audio.onplay = () => { avatar.classList.add('speaking'); };
+                const finish = () => { avatar.classList.remove('speaking'); resolve(); };
                 audio.onended = finish;
                 audio.onerror = finish;
                 audio.play().catch(finish);
@@ -528,8 +540,8 @@
              const pName = mapP[result.personality] || "未知";
              document.getElementById('personality-display').textContent = `${mapE[result.personality]||'❓'} ${pName}`;
              document.getElementById('personality-mode-tag').textContent = result.new_manual_personality ? '手動' : '自動';
+             document.getElementById('assistant-emoji').textContent = mapE[result.personality]||'❓';
              
-             // 趨勢標籤
              const trendTag = document.getElementById('emotion-trend-tag');
              trendTag.textContent = getTrendMessage(result.emotion_trend);
              let cssClass = 'stable';
@@ -554,20 +566,8 @@
                  document.getElementById('facial-frames').textContent = `${e.num_valid_frames}/${e.num_total_frames}`;
              }
 
-             // 🟢 更新圖片
-             const avatar = document.getElementById('assistant-avatar');
-             const personalityKey = result.personality || 'humorous';
-             const newSrc = `static/image/${personalityKey}.png`; // 注意路徑是 static/image
-             
-             avatar.style.opacity = 0;
-             setTimeout(() => {
-                 avatar.src = newSrc;
-                 avatar.onerror = function() { 
-                     this.src = 'static/image/humorous.png'; 
-                     appendLog(`⚠️ 找不到圖片: ${personalityKey}.png`, 'warning');
-                 };
-                 avatar.onload = function() { avatar.style.opacity = 1; }
-             }, 200);
+             // 🟢 更新圖片 (呼叫我們新寫的函式)
+             loadRemoteImage(result.personality || 'humorous');
         }
 
         function getTrendMessage(trend) { 
@@ -584,11 +584,6 @@
             div.innerHTML = msg;
             document.getElementById('log-display').prepend(div);
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-             document.getElementById('record-button').addEventListener('click', toggleRecording);
-             checkUrlValidity();
-        });
     </script>
 </body>
 </html>
