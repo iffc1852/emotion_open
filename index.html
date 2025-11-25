@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面 (最終整合版)</title>
+    <title> 多模態情感助理 - Web 介面</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -17,7 +17,6 @@
         .emotion-score { font-weight: bold; color: #28a745; margin-left: 10px; }
         .main-status { font-size: 2em; color: #ffc107; margin-bottom: 15px; }
         .current-personality { font-size: 1.5em; font-weight: bold; color: #6f42c1; }
-        .emoji-display { font-size: 8em; line-height: 1; margin-top: 50px; }
         
         /* 錄音控制 */
         .record-control { text-align: center; margin-bottom: 20px; padding: 10px; border: 2px dashed #007bff; border-radius: 10px; }
@@ -42,12 +41,10 @@
         #connect-btn { padding: 8px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; }
         #connect-btn:hover { background-color: #218838; }
 
-        /* 除錯下載連結樣式 */
         #debug-link-container { margin-top: 15px; min-height: 30px; }
         .debug-link { display: inline-block; padding: 8px 20px; background-color: #17a2b8; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .debug-link:hover { background-color: #138496; transform: translateY(-1px); }
 
-        /* 音量數值顯示 */
         #vol-display { font-weight: bold; color: #dc3545; margin-left: 10px; }
         #vol-display.active { color: #28a745; }
 
@@ -57,12 +54,23 @@
         .status-tag.worsening { background-color: #ffe6e6; color: #dc3545; }
         .status-tag.improving { background-color: #e6ffe6; color: #28a745; }
         .hidden { display: none; }
+        
+        /* 說話動畫 (讓圖片跳動) */
+        @keyframes speak-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .speaking {
+            animation: speak-pulse 0.5s infinite ease-in-out;
+        }
+
     </style>
 </head>
 <body>
     <div class="container">
         <div class="left-panel">
-            <h1>💬 AI 多模態助理 (最終整合版)</h1>
+            <h1>💬 AI 多模態助理 (圖像版)</h1>
             
             <div class="input-group">
                 <label for="tunnel-url">🚨 Cloudflare Tunnel HTTPS 網址 (必填):</label>
@@ -120,8 +128,14 @@
         <div class="right-panel">
             <h1>🎭 助理表情</h1>
             <div id="status-message" class="main-status">等待連線...</div>
-            <div id="assistant-emoji" class="emoji-display">🤔</div>
             
+            <div id="avatar-container" style="display: flex; justify-content: center; align-items: center; height: 300px; margin-top: 20px;">
+                <img id="assistant-avatar" 
+                     src="static/image/humorous.png" 
+                     alt="AI Avatar"
+                     style="max-width: 100%; max-height: 100%; object-fit: contain; transition: opacity 0.5s ease;">
+            </div>
+
             <h2>📜 執行 Log</h2>
             <div id="log-display" class="log-section">
                 <div class="log-item">ℹ️ 網頁初始化完成。請貼上網址並點擊「確認連線」按鈕。</div>
@@ -136,7 +150,6 @@
         const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
         let currentState = STATE.IDLE;
         
-        // 🟢 關鍵：網頁載入時產生一次 ID，之後一直用它 (解決失憶問題)
         const currentSessionId = Date.now().toString(); 
 
         let mediaRecorder; let audioStream; let videoTrack; let audioContext; let analyserNode; 
@@ -144,24 +157,16 @@
         let audioChunks = []; let capturedImageBlobs = []; let captureInterval;
         let ignoreClicksUntil = 0;
 
-        // VAD/錄音參數
         const LOCK_SECONDS = 3; 
         const SILENCE_TIMEOUT_SECONDS = 3; 
         const MAX_RECORD_SECONDS = 15; 
-        
-        // 🔴 靈敏度設定：設為 4 (比呼吸聲2大，比人聲10小)
-        const VOICE_THRESHOLD = 4;    
-        
+        const VOICE_THRESHOLD = 2;    
         const FRAME_RATE = 0.5; 
         const WAKE_WORD = "嗨小白"; 
         
         let CURRENT_BASE_URL = null;
         const API_PROCESS_PATH = "/api/v1/process"; 
         const API_DOWNLOAD_PATH = "/api/v1/audio-download";
-
-        // ------------------------------------------------------------------
-        // 狀態機與主要控制
-        // ------------------------------------------------------------------
 
         function manualConnect() { checkUrlValidity(); }
 
@@ -188,7 +193,6 @@
                     
                 case STATE.RECORDING:
                     button.classList.add('recording');
-                    // 清除舊的下載連結
                     document.getElementById('debug-link-container').innerHTML = '';
                     
                     let countdown = LOCK_SECONDS;
@@ -208,7 +212,7 @@
                         }
                     }, 1000);
 
-                    recordStatus.textContent = `狀態: 錄音中 (靜音 ${SILENCE_TIMEOUT_SECONDS}s 或 ${MAX_RECORD_SECONDS}s 後停止)`;
+                    recordStatus.textContent = `狀態: 錄音中 (靜音 ${SILENCE_TIMEOUT_SECONDS}s 自動停止)`;
                     document.getElementById('status-message').textContent = '請說話...';
                     recordingStartTime = Date.now();
                     durationTimer = setInterval(updateDuration, 1000);
@@ -279,7 +283,6 @@
         async function uploadData() {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
             
-            // 除錯下載連結
             const audioUrl = URL.createObjectURL(audioBlob);
             const downloadLink = document.createElement('a');
             downloadLink.href = audioUrl;
@@ -288,7 +291,6 @@
             downloadLink.className = 'debug-link';
             document.getElementById('debug-link-container').appendChild(downloadLink);
 
-            // 門檻檢查
             if (audioBlob.size < 1000) {
                 appendLog('⚠️ 錄音極短 (Size<1KB)，取消上傳。', 'warning');
                 updateState(STATE.IDLE);
@@ -298,15 +300,7 @@
             const formData = new FormData();
             formData.append('audio_file', audioBlob, `audio_${Date.now()}.webm`); 
             capturedImageBlobs.forEach((b, i) => formData.append(`image_${i}`, b, `frame_${i}.jpg`));
-            
-            // 🟢 關鍵：傳送固定的 session_id
-            const turnData = {
-                session_id: currentSessionId, 
-                history: [], 
-                current_personality: null,
-                wake_word: WAKE_WORD
-            };
-            formData.append('turn_data', JSON.stringify(turnData));
+            formData.append('turn_data', JSON.stringify({ session_id: currentSessionId, history: [], wake_word: WAKE_WORD }));
             
             appendLog(`📦 打包完成，上傳中...`);
             
@@ -451,7 +445,6 @@
                 for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
                 const now = audioContext.currentTime;
 
-                // 🔴 顯示數值到網頁上
                 const volDisplay = document.getElementById('vol-display');
                 if (debugCounter++ % 10 === 0) { 
                     volDisplay.textContent = `(Vol: ${max})`;
@@ -464,8 +457,6 @@
                     hasVoice = true;
                     lastActive = now;
                 }
-                
-                // 安全期 3 秒 + 靜音超時
                 if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
                     if ((now - detectionStartTime) > LOCK_SECONDS) { 
                         stopRecording(true);
@@ -509,12 +500,25 @@
         async function playTTSAudio(filename) {
             if (!filename) return;
             const audio = document.getElementById('tts-audio');
+            const avatar = document.getElementById('assistant-avatar'); // 取得圖片元素
+
             audio.src = CURRENT_BASE_URL + API_DOWNLOAD_PATH + `?filename=${filename}`;
             audio.classList.remove('hidden');
             return new Promise(resolve => {
-                audio.onended = resolve;
-                audio.onerror = resolve;
-                audio.play().catch(resolve);
+                // 🟢 播放開始：加入 speaking class (開始跳動)
+                audio.onplay = () => {
+                    avatar.classList.add('speaking');
+                };
+
+                // 🔴 播放結束/錯誤：移除 speaking class (停止跳動)
+                const finish = () => {
+                    avatar.classList.remove('speaking');
+                    resolve();
+                };
+
+                audio.onended = finish;
+                audio.onerror = finish;
+                audio.play().catch(finish);
             });
         }
 
@@ -524,18 +528,13 @@
              const pName = mapP[result.personality] || "未知";
              document.getElementById('personality-display').textContent = `${mapE[result.personality]||'❓'} ${pName}`;
              document.getElementById('personality-mode-tag').textContent = result.new_manual_personality ? '手動' : '自動';
-             document.getElementById('assistant-emoji').textContent = mapE[result.personality]||'❓';
              
-             // 🟢 新增：更新情緒趨勢標籤顏色與文字
+             // 趨勢標籤
              const trendTag = document.getElementById('emotion-trend-tag');
              trendTag.textContent = getTrendMessage(result.emotion_trend);
-             
              let cssClass = 'stable';
-             if (result.emotion_trend === 'worsening' || result.emotion_trend === 'persistent_worsening') {
-                 cssClass = 'worsening'; 
-             } else if (result.emotion_trend === 'improving' || result.emotion_trend === 'persistent_improving') {
-                 cssClass = 'improving'; 
-             }
+             if (result.emotion_trend === 'worsening' || result.emotion_trend === 'persistent_worsening') cssClass = 'worsening'; 
+             else if (result.emotion_trend === 'improving' || result.emotion_trend === 'persistent_improving') cssClass = 'improving'; 
              trendTag.className = `status-tag ${cssClass}`;
 
              if(result.emotion_results?.text) {
@@ -554,6 +553,21 @@
                  document.getElementById('facial-score').textContent = `${(e.confidence*100).toFixed(1)}%`;
                  document.getElementById('facial-frames').textContent = `${e.num_valid_frames}/${e.num_total_frames}`;
              }
+
+             // 🟢 更新圖片
+             const avatar = document.getElementById('assistant-avatar');
+             const personalityKey = result.personality || 'humorous';
+             const newSrc = `static/image/${personalityKey}.png`; // 注意路徑是 static/image
+             
+             avatar.style.opacity = 0;
+             setTimeout(() => {
+                 avatar.src = newSrc;
+                 avatar.onerror = function() { 
+                     this.src = 'static/image/humorous.png'; 
+                     appendLog(`⚠️ 找不到圖片: ${personalityKey}.png`, 'warning');
+                 };
+                 avatar.onload = function() { avatar.style.opacity = 1; }
+             }, 200);
         }
 
         function getTrendMessage(trend) { 
