@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面 </title>
+    <title>AI 多模態助理 - Web 介面</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -17,6 +17,7 @@
         .emotion-score { font-weight: bold; color: #28a745; margin-left: 10px; }
         .main-status { font-size: 2em; color: #ffc107; margin-bottom: 15px; }
         .current-personality { font-size: 1.5em; font-weight: bold; color: #6f42c1; }
+        .emoji-display { font-size: 8em; line-height: 1; margin-top: 50px; }
         
         /* 錄音控制 */
         .record-control { text-align: center; margin-bottom: 20px; padding: 10px; border: 2px dashed #007bff; border-radius: 10px; }
@@ -41,6 +42,7 @@
         #connect-btn { padding: 8px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; }
         #connect-btn:hover { background-color: #218838; }
 
+        /* 除錯下載連結樣式 */
         #debug-link-container { margin-top: 15px; min-height: 30px; }
         .debug-link { display: inline-block; padding: 8px 20px; background-color: #17a2b8; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .debug-link:hover { background-color: #138496; transform: translateY(-1px); }
@@ -70,7 +72,7 @@
 <body>
     <div class="container">
         <div class="left-panel">
-            <h1>💬 AI 多模態助理</h1>
+            <h1>💬 AI 多模態助理 1</h1>
             
             <div class="input-group">
                 <label for="tunnel-url">🚨 Cloudflare Tunnel HTTPS 網址 (必填):</label>
@@ -168,7 +170,7 @@
         const API_DOWNLOAD_PATH = "/api/v1/audio-download";
 
         // ------------------------------------------------------------------
-        // 連線與圖片載入 (新增邏輯)
+        // 連線與圖片載入 (之前遺失的函式，已補上)
         // ------------------------------------------------------------------
 
         function manualConnect() { checkUrlValidity(); }
@@ -177,24 +179,19 @@
             if (!CURRENT_BASE_URL) return;
             
             const avatar = document.getElementById('assistant-avatar');
-            // 🟢 關鍵：使用 Tunnel URL 來載入本地圖片
+            // 🟢 使用 Tunnel URL 載入本地圖片
             const newSrc = `${CURRENT_BASE_URL}/static/image/${personalityKey}.png`; 
             
-            // 只有當圖片真的改變時才重載
             if (!avatar.src.includes(newSrc)) {
                 avatar.style.opacity = 0;
                 setTimeout(() => {
                     avatar.src = newSrc;
                     
                     avatar.onerror = function() { 
-                        this.onerror = null; // 防止無限迴圈
-                        // 如果指定的圖片找不到，試著載入預設的 humorous
-                        if (personalityKey !== 'humorous') {
-                             appendLog(`⚠️ 找不到圖片 ${personalityKey}.png，嘗試載入預設圖。`, 'warning');
-                             this.src = `${CURRENT_BASE_URL}/static/image/humorous.png`; 
-                        } else {
-                             appendLog(`❌ 連預設圖 humorous.png 都找不到，請檢查後端 static/image 資料夾。`, 'error');
-                        }
+                        this.onerror = null; 
+                        // 備用圖
+                        this.src = `${CURRENT_BASE_URL}/static/image/humorous.png`; 
+                        appendLog(`⚠️ 找不到圖片 ${personalityKey}.png，載入預設圖。`, 'warning');
                     };
                     
                     avatar.onload = function() { 
@@ -204,7 +201,7 @@
             }
         }
 
-        // ... (updateState, toggleRecording, startRecording, stopRecording 等函數保持不變) ...
+        // ... (其他邏輯保持不變) ...
         function updateState(newState) {
             currentState = newState;
             const button = document.getElementById('record-button');
@@ -305,7 +302,6 @@
         
         async function uploadData() {
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
-            
             const audioUrl = URL.createObjectURL(audioBlob);
             const downloadLink = document.createElement('a');
             downloadLink.href = audioUrl;
@@ -338,35 +334,6 @@
             }
         }
         
-        // ... (其他輔助函數) ...
-
-        function checkUrlValidity() {
-            const urlInput = document.getElementById('tunnel-url');
-            const url = urlInput.value.trim();
-            try {
-                const urlObj = new URL(url);
-                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
-                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
-                    urlInput.style.borderColor = '#28a745';
-                    appendLog(`✅ 網址有效。`);
-                    
-                    // 🟢 連線成功後，嘗試載入預設圖片 (這會測試圖片路徑是否通)
-                    loadRemoteImage('humorous');
-
-                    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-                        .then(s => { s.getTracks().forEach(t => t.stop()); getAudioDevices(); })
-                        .catch(e => appendLog(`❌ 需權限: ${e.message}`, 'error'));
-                    return true;
-                } else throw new Error();
-            } catch (e) {
-                CURRENT_BASE_URL = null;
-                document.getElementById('record-button').disabled = true;
-                urlInput.style.borderColor = '#dc3545';
-                return false;
-            }
-        }
-
-        // ... (Audio Device, VAD, Capture functions 同上) ...
         async function getAudioDevices() {
             const select = document.getElementById('mic-select');
             select.innerHTML = '<option value="" disabled>正在掃描裝置...</option>';
@@ -392,6 +359,7 @@
                 appendLog(`⚠️ 無法列舉裝置: ${e.message}`, 'error');
             }
         }
+
         async function changeAudioInput() {
             const deviceId = document.getElementById('mic-select').value;
             if (deviceId) {
@@ -399,6 +367,7 @@
                 await initMediaDevices(deviceId);
             }
         }
+
         async function initMediaDevices(deviceId = null) {
             if (audioStream) audioStream.getTracks().forEach(track => track.stop());
             const constraints = {
@@ -416,6 +385,31 @@
                 appendLog(`❌ 媒體失敗: ${err.message}`, 'error');
             }
         }
+
+        function checkUrlValidity() {
+            const urlInput = document.getElementById('tunnel-url');
+            const url = urlInput.value.trim();
+            try {
+                const urlObj = new URL(url);
+                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
+                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
+                    urlInput.style.borderColor = '#28a745';
+                    appendLog(`✅ 網址有效。`);
+                    // 連線成功後載入預設圖片
+                    loadRemoteImage('humorous');
+                    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                        .then(s => { s.getTracks().forEach(t => t.stop()); getAudioDevices(); })
+                        .catch(e => appendLog(`❌ 需權限: ${e.message}`, 'error'));
+                    return true;
+                } else throw new Error();
+            } catch (e) {
+                CURRENT_BASE_URL = null;
+                document.getElementById('record-button').disabled = true;
+                urlInput.style.borderColor = '#dc3545';
+                return false;
+            }
+        }
+
         function setupAudioAnalysis(stream) {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             if (audioContext.state === 'suspended') audioContext.resume();
@@ -424,6 +418,7 @@
             analyserNode.fftSize = 2048; 
             source.connect(analyserNode);
         }
+
         function visualizeAudio() {
             const canvas = document.getElementById('audio-visualizer');
             const ctx = canvas.getContext('2d');
@@ -453,6 +448,7 @@
             }
             draw();
         }
+
         function detectSilence() {
             if (!analyserNode) return;
             visualizeAudio(); 
@@ -489,11 +485,13 @@
             }
             requestAnimationFrame(loop);
         }
+
         function updateDuration() {
             const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
             document.getElementById('duration-display').textContent = 
                 `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
         }
+        
         function startFaceCapture() {
             capturedImageBlobs = [];
             captureInterval = setInterval(() => {
@@ -521,11 +519,9 @@
             if (!filename) return;
             const audio = document.getElementById('tts-audio');
             const avatar = document.getElementById('assistant-avatar');
-
             audio.src = CURRENT_BASE_URL + API_DOWNLOAD_PATH + `?filename=${filename}`;
             audio.classList.remove('hidden');
             return new Promise(resolve => {
-                // 🟢 說話動畫
                 audio.onplay = () => { avatar.classList.add('speaking'); };
                 const finish = () => { avatar.classList.remove('speaking'); resolve(); };
                 audio.onended = finish;
@@ -540,7 +536,6 @@
              const pName = mapP[result.personality] || "未知";
              document.getElementById('personality-display').textContent = `${mapE[result.personality]||'❓'} ${pName}`;
              document.getElementById('personality-mode-tag').textContent = result.new_manual_personality ? '手動' : '自動';
-             document.getElementById('assistant-emoji').textContent = mapE[result.personality]||'❓';
              
              const trendTag = document.getElementById('emotion-trend-tag');
              trendTag.textContent = getTrendMessage(result.emotion_trend);
@@ -566,7 +561,7 @@
                  document.getElementById('facial-frames').textContent = `${e.num_valid_frames}/${e.num_total_frames}`;
              }
 
-             // 🟢 更新圖片 (呼叫我們新寫的函式)
+             // 🟢 呼叫圖片切換
              loadRemoteImage(result.personality || 'humorous');
         }
 
@@ -584,6 +579,11 @@
             div.innerHTML = msg;
             document.getElementById('log-display').prepend(div);
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+             document.getElementById('record-button').addEventListener('click', toggleRecording);
+             checkUrlValidity();
+        });
     </script>
 </body>
 </html>
