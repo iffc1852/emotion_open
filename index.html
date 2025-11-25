@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 - Web 介面</title>
+    <title>AI 多模態情緒助理</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f7f9; }
         .container { display: flex; max-width: 1300px; margin: 20px auto; background-color: white; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 10px; min-height: 80vh; }
@@ -11,42 +11,39 @@
         .right-panel { flex: 1; padding: 20px; text-align: center; background-color: #fafafa; border-radius: 0 10px 10px 0; }
         h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; }
         h2 { color: #007bff; margin-top: 20px; }
-        .log-section { margin-top: 15px; padding: 15px; background-color: #e9ecef; border-radius: 5px; max-height: 250px; overflow-y: auto; font-size: 0.9em;}
-        .log-item { margin-bottom: 8px; border-bottom: 1px dotted #ccc; padding-bottom: 5px; }
+        
+        /* 計算過程顯示區 (新) */
+        .calc-box { 
+            background-color: #2d2d2d; color: #00ff00; 
+            padding: 10px; border-radius: 5px; font-family: 'Consolas', monospace; 
+            font-size: 0.9em; margin-bottom: 15px; text-align: left; white-space: pre-wrap;
+        }
+
         .emotion-box { padding: 15px; border: 1px solid #ced4da; border-radius: 8px; margin-bottom: 15px; }
         .emotion-score { font-weight: bold; color: #28a745; margin-left: 10px; }
         .main-status { font-size: 2em; color: #ffc107; margin-bottom: 15px; }
         .current-personality { font-size: 1.5em; font-weight: bold; color: #6f42c1; }
-        .emoji-display { font-size: 8em; line-height: 1; margin-top: 50px; }
         
         /* 錄音控制 */
         .record-control { text-align: center; margin-bottom: 20px; padding: 10px; border: 2px dashed #007bff; border-radius: 10px; }
-        #record-button { padding: 15px 30px; font-size: 1.2em; background-color: #dc3545; color: white; border: none; border-radius: 50px; cursor: pointer; transition: background-color 0.3s, transform 0.1s; }
+        #record-button { padding: 15px 30px; font-size: 1.2em; background-color: #dc3545; color: white; border: none; border-radius: 50px; cursor: pointer; transition: background-color 0.3s; }
         #record-button:hover:not(:disabled) { background-color: #c82333; }
-        #record-button:active:not(:disabled) { transform: scale(0.98); }
         #record-button.recording { background-color: #28a745; }
         #record-button:disabled { opacity: 0.7; cursor: not-allowed; background-color: #6c757d !important; }
         
-        /* 攝影機與波形區 */
         #camera-preview { position: relative; width: 100%; height: 200px; background-color: #333; margin-top: 10px; border-radius: 5px; overflow: hidden; }
         #camera-preview video { width: 100%; height: 100%; object-fit: cover; }
-        #audio-visualizer { position: absolute; bottom: 0; left: 0; width: 100%; height: 50px; background-color: rgba(0, 0, 0, 0.5); z-index: 10; border-radius: 0 0 5px 5px; }
+        #audio-visualizer { position: absolute; bottom: 0; left: 0; width: 100%; height: 50px; background-color: rgba(0, 0, 0, 0.5); z-index: 10; }
         #duration-display { position: absolute; top: 5px; right: 10px; color: white; font-weight: bold; z-index: 11; }
 
-        /* URL 與 裝置輸入區 */
         .input-group { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f8f8f8; }
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
         .input-group input, .input-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        
         .url-container { display: flex; gap: 10px; }
-        #connect-btn { padding: 8px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; }
-        #connect-btn:hover { background-color: #218838; }
+        #connect-btn { padding: 8px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
 
-        /* 除錯下載連結樣式 */
         #debug-link-container { margin-top: 15px; min-height: 30px; }
-        .debug-link { display: inline-block; padding: 8px 20px; background-color: #17a2b8; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .debug-link:hover { background-color: #138496; transform: translateY(-1px); }
-
+        .debug-link { display: inline-block; padding: 8px 20px; background-color: #17a2b8; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
         #vol-display { font-weight: bold; color: #dc3545; margin-left: 10px; }
         #vol-display.active { color: #28a745; }
 
@@ -55,25 +52,16 @@
         .status-tag.manual { background-color: #fff0e6; color: #ff6600; }
         .status-tag.worsening { background-color: #ffe6e6; color: #dc3545; }
         .status-tag.improving { background-color: #e6ffe6; color: #28a745; }
-        .hidden { display: none; }
+        .log-section { margin-top: 15px; padding: 15px; background-color: #e9ecef; border-radius: 5px; max-height: 250px; overflow-y: auto; font-size: 0.9em;}
         
-        /* 說話動畫 */
-        @keyframes speak-pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-        .speaking {
-            animation: speak-pulse 0.5s infinite ease-in-out;
-        }
-
+        @keyframes speak-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .speaking { animation: speak-pulse 0.5s infinite ease-in-out; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="left-panel">
-            <h1>💬 AI 多模態助理 1</h1>
-            
+            <h1>💬 AI 多模態情緒助理 </h1>
             <div class="input-group">
                 <label for="tunnel-url">🚨 Cloudflare Tunnel HTTPS 網址 (必填):</label>
                 <div class="url-container">
@@ -81,22 +69,17 @@
                     <button id="connect-btn" onclick="manualConnect()">確認連線</button>
                 </div>
             </div>
-
             <div class="input-group">
                 <label for="mic-select">🎤 選擇麥克風裝置:</label>
                 <select id="mic-select" onchange="changeAudioInput()">
                     <option value="" disabled selected>請先點擊「確認連線」...</option>
                 </select>
             </div>
-
             <div class="record-control">
                 <button id="record-button" onclick="toggleRecording()" disabled>
                     <span id="record-text">請先輸入網址並連線...</span>
                 </button>
-                <p>
-                    <span id="record-status">狀態: 閒置中...</span>
-                    <span id="vol-display">(Vol: 0)</span>
-                </p>
+                <p><span id="record-status">狀態: 閒置中...</span><span id="vol-display">(Vol: 0)</span></p>
                 <div id="camera-preview">
                     <video id="video-stream" autoplay muted></video>
                     <canvas id="audio-visualizer"></canvas>
@@ -105,20 +88,21 @@
                 <div id="debug-link-container"></div>
             </div>
 
+            <h2>🧮 權重計算過程</h2>
+            <div id="calc-display" class="calc-box">等待第一次運算...</div>
+
             <h2>核心狀態</h2>
             <div class="emotion-box">
                 <p><strong>當前人格:</strong> <span id="personality-display" class="current-personality">等待中...</span></p>
                 <p><strong>人格模式:</strong> <span id="personality-mode-tag" class="status-tag auto">自動 (Auto)</span></p>
                 <p><strong>記憶趨勢:</strong> <span id="emotion-trend-tag" class="status-tag improving">穩定 (Stable)</span></p>
             </div>
-
             <h2>🔬 多模態情緒分析</h2>
             <div class="emotion-box">
                 <p><strong>📝 文字情緒:</strong> <span id="text-emotion">--</span> (信心度: <span id="text-score" class="emotion-score">0.00%</span>)</p>
                 <p><strong>🎤 語音情緒:</strong> <span id="audio-emotion">--</span> (信心度: <span id="audio-score" class="emotion-score">0.00%</span>)</p>
                 <p><strong>🎭 臉部情緒:</strong> <span id="facial-emotion">--</span> (信心度: <span id="facial-score" class="emotion-score">0.00%</span>, 幀數: <span id="facial-frames">0/0</span>)</p>
             </div>
-
             <h2>🗣️ 最新對話</h2>
             <div class="emotion-box">
                 <p><strong>使用者:</strong> <span id="user-text">...</span></p>
@@ -126,88 +110,64 @@
                 <audio id="tts-audio" controls class="hidden"></audio>
             </div>
         </div>
-
         <div class="right-panel">
             <h1>🎭 助理表情</h1>
             <div id="status-message" class="main-status">等待連線...</div>
-            
             <div id="avatar-container" style="display: flex; justify-content: center; align-items: center; height: 300px; margin-top: 20px;">
-                <img id="assistant-avatar" 
-                     src="" 
-                     alt="AI Avatar"
-                     style="max-width: 100%; max-height: 100%; object-fit: contain; transition: opacity 0.5s ease; opacity: 0;">
+                <img id="assistant-avatar" src="" alt="AI Avatar" style="max-width: 100%; max-height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.5s ease;">
             </div>
-
             <h2>📜 執行 Log</h2>
-            <div id="log-display" class="log-section">
-                <div class="log-item">ℹ️ 網頁初始化完成。請貼上網址並點擊「確認連線」按鈕。</div>
-            </div>
+            <div id="log-display" class="log-section"><div class="log-item">ℹ️ 網頁初始化完成。</div></div>
         </div>
     </div>
 
     <script>
-        // -----------------------------------------------------
-        // 核心狀態與參數
-        // -----------------------------------------------------
         const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
         let currentState = STATE.IDLE;
         const currentSessionId = Date.now().toString(); 
-
-        let mediaRecorder; let audioStream; let videoTrack; let audioContext; let analyserNode; 
-        let recordingStartTime; let durationTimer; let maxDurationTimeout;
-        let audioChunks = []; let capturedImageBlobs = []; let captureInterval;
-        let ignoreClicksUntil = 0;
+        let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode, recordingStartTime, durationTimer, maxDurationTimeout;
+        let audioChunks = [], capturedImageBlobs = [], captureInterval, ignoreClicksUntil = 0;
 
         const LOCK_SECONDS = 3; 
         const SILENCE_TIMEOUT_SECONDS = 3; 
         const MAX_RECORD_SECONDS = 15; 
-        const VOICE_THRESHOLD = 4;    
+        const NO_SPEECH_TIMEOUT = 5; // 🟢 5秒沒聲音自動斷
+        
+        // 🔴 閾值設為 2 (針對您的 Vol 1 底噪)
+        const VOICE_THRESHOLD = 2;    
         const FRAME_RATE = 0.5; 
         const WAKE_WORD = "嗨小白"; 
-        
         let CURRENT_BASE_URL = null;
         const API_PROCESS_PATH = "/api/v1/process"; 
         const API_DOWNLOAD_PATH = "/api/v1/audio-download";
-
-        // ------------------------------------------------------------------
-        // 連線與圖片載入 (之前遺失的函式，已補上)
-        // ------------------------------------------------------------------
 
         function manualConnect() { checkUrlValidity(); }
 
         function loadRemoteImage(personalityKey = 'humorous') {
             if (!CURRENT_BASE_URL) return;
-            
             const avatar = document.getElementById('assistant-avatar');
-            // 🟢 使用 Tunnel URL 載入本地圖片
             const newSrc = `${CURRENT_BASE_URL}/static/image/${personalityKey}.png`; 
-            
             if (!avatar.src.includes(newSrc)) {
                 avatar.style.opacity = 0;
                 setTimeout(() => {
                     avatar.src = newSrc;
-                    
                     avatar.onerror = function() { 
                         this.onerror = null; 
-                        // 備用圖
                         this.src = `${CURRENT_BASE_URL}/static/image/humorous.png`; 
-                        appendLog(`⚠️ 找不到圖片 ${personalityKey}.png，載入預設圖。`, 'warning');
+                        appendLog(`⚠️ 找不到圖片 ${personalityKey}.png`, 'warning');
                     };
-                    
-                    avatar.onload = function() { 
-                        avatar.style.opacity = 1; 
-                    }
+                    avatar.onload = function() { avatar.style.opacity = 1; }
                 }, 200);
             }
         }
 
-        // ... (其他邏輯保持不變) ...
         function updateState(newState) {
             currentState = newState;
             const button = document.getElementById('record-button');
             const recordText = document.getElementById('record-text');
             const recordStatus = document.getElementById('record-status');
             appendLog(`[狀態切換] 進入 ${newState} 模式...`);
+
             switch (newState) {
                 case STATE.IDLE:
                     button.disabled = false; button.classList.remove('recording');
@@ -272,8 +232,7 @@
         async function startRecording() {
             if (currentState !== STATE.IDLE) return;
             updateState(STATE.RECORDING);
-            audioChunks = [];
-            capturedImageBlobs = [];
+            audioChunks = []; capturedImageBlobs = [];
             try {
                 mediaRecorder = new MediaRecorder(audioStream);
                 mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
@@ -283,7 +242,7 @@
                 setupAudioAnalysis(audioStream);
                 detectSilence(); 
             } catch (e) {
-                appendLog(`❌ 錄音啟動失敗: ${e.message}`, 'error');
+                appendLog(`❌ 錄音失敗: ${e.message}`, 'error');
                 updateState(STATE.IDLE);
             }
         }
@@ -295,8 +254,7 @@
             const canvas = document.getElementById('audio-visualizer');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (isSilentStop) appendLog(`🛑 VAD 靜音結束。`);
-            else appendLog(`🛑 錄音結束。`);
+            appendLog(isSilentStop ? `🛑 VAD 靜音結束。` : `🛑 錄音結束。`);
             updateState(STATE.PROCESSING); 
         }
         
@@ -304,207 +262,31 @@
             const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
             const audioUrl = URL.createObjectURL(audioBlob);
             const downloadLink = document.createElement('a');
-            downloadLink.href = audioUrl;
-            downloadLink.download = `debug_audio_${Date.now()}.webm`;
-            downloadLink.textContent = `📥 下載錄音檔 (Size: ${(audioBlob.size/1024).toFixed(1)}KB)`;
+            downloadLink.href = audioUrl; downloadLink.download = `debug_${Date.now()}.webm`;
+            downloadLink.textContent = `📥 下載錄音 (Size: ${(audioBlob.size/1024).toFixed(1)}KB)`;
             downloadLink.className = 'debug-link';
             document.getElementById('debug-link-container').appendChild(downloadLink);
 
             if (audioBlob.size < 1000) {
-                appendLog('⚠️ 錄音極短 (Size<1KB)，取消上傳。', 'warning');
+                appendLog('⚠️ 錄音極短，取消上傳。', 'warning');
                 updateState(STATE.IDLE);
                 return;
             }
-            
             const formData = new FormData();
             formData.append('audio_file', audioBlob, `audio_${Date.now()}.webm`); 
             capturedImageBlobs.forEach((b, i) => formData.append(`image_${i}`, b, `frame_${i}.jpg`));
             formData.append('turn_data', JSON.stringify({ session_id: currentSessionId, history: [], wake_word: WAKE_WORD }));
-            
             appendLog(`📦 打包完成，上傳中...`);
-            
             try {
                 const res = await fetch(CURRENT_BASE_URL + API_PROCESS_PATH, { method: 'POST', body: formData });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const result = await res.json();
-                handleAPIReply(result);
+                handleAPIReply(await res.json());
             } catch (err) {
                 appendLog(`❌ 上傳失敗: ${err.message}`, 'error');
                 updateState(STATE.IDLE);
             }
         }
         
-        async function getAudioDevices() {
-            const select = document.getElementById('mic-select');
-            select.innerHTML = '<option value="" disabled>正在掃描裝置...</option>';
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const audioInputs = devices.filter(device => device.kind === 'audioinput');
-                select.innerHTML = ''; 
-                if (audioInputs.length === 0) {
-                    const option = document.createElement('option'); option.text = "未偵測到麥克風"; select.add(option); return;
-                }
-                audioInputs.forEach(device => {
-                    const option = document.createElement('option');
-                    option.value = device.deviceId;
-                    option.text = device.label || `麥克風 ${select.length + 1}`;
-                    select.add(option);
-                });
-                if (audioInputs.length > 0) {
-                    select.value = audioInputs[0].deviceId;
-                    initMediaDevices(audioInputs[0].deviceId);
-                }
-                appendLog(`🎤 發現 ${audioInputs.length} 個麥克風。`);
-            } catch (e) {
-                appendLog(`⚠️ 無法列舉裝置: ${e.message}`, 'error');
-            }
-        }
-
-        async function changeAudioInput() {
-            const deviceId = document.getElementById('mic-select').value;
-            if (deviceId) {
-                appendLog(`🔄 切換麥克風...`);
-                await initMediaDevices(deviceId);
-            }
-        }
-
-        async function initMediaDevices(deviceId = null) {
-            if (audioStream) audioStream.getTracks().forEach(track => track.stop());
-            const constraints = {
-                audio: { deviceId: deviceId ? { exact: deviceId } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-                video: { width: 640, height: 480 }
-            };
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                audioStream = stream;
-                document.getElementById('video-stream').srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
-                appendLog(`✅ 媒體裝置就緒。`);
-                document.getElementById('record-button').disabled = false;
-            } catch (err) {
-                appendLog(`❌ 媒體失敗: ${err.message}`, 'error');
-            }
-        }
-
-        function checkUrlValidity() {
-            const urlInput = document.getElementById('tunnel-url');
-            const url = urlInput.value.trim();
-            try {
-                const urlObj = new URL(url);
-                if (urlObj.protocol === 'https:' && url.includes('trycloudflare.com')) {
-                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
-                    urlInput.style.borderColor = '#28a745';
-                    appendLog(`✅ 網址有效。`);
-                    // 連線成功後載入預設圖片
-                    loadRemoteImage('humorous');
-                    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-                        .then(s => { s.getTracks().forEach(t => t.stop()); getAudioDevices(); })
-                        .catch(e => appendLog(`❌ 需權限: ${e.message}`, 'error'));
-                    return true;
-                } else throw new Error();
-            } catch (e) {
-                CURRENT_BASE_URL = null;
-                document.getElementById('record-button').disabled = true;
-                urlInput.style.borderColor = '#dc3545';
-                return false;
-            }
-        }
-
-        function setupAudioAnalysis(stream) {
-            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioContext.state === 'suspended') audioContext.resume();
-            const source = audioContext.createMediaStreamSource(stream);
-            analyserNode = audioContext.createAnalyser(); 
-            analyserNode.fftSize = 2048; 
-            source.connect(analyserNode);
-        }
-
-        function visualizeAudio() {
-            const canvas = document.getElementById('audio-visualizer');
-            const ctx = canvas.getContext('2d');
-            const WIDTH = canvas.width = canvas.clientWidth;
-            const HEIGHT = canvas.height = canvas.clientHeight;
-            if (!analyserNode) return;
-            const bufferLength = analyserNode.fftSize;
-            const dataArray = new Uint8Array(bufferLength);
-            function draw() {
-                if (currentState !== STATE.RECORDING) return;
-                requestAnimationFrame(draw);
-                analyserNode.getByteTimeDomainData(dataArray);
-                ctx.clearRect(0, 0, WIDTH, HEIGHT);
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = 'rgb(0, 255, 0)'; 
-                ctx.beginPath();
-                const sliceWidth = WIDTH * 1.0 / bufferLength;
-                let x = 0;
-                for(let i = 0; i < bufferLength; i++) {
-                    const v = dataArray[i] / 128.0;
-                    const y = v * HEIGHT/2;
-                    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                    x += sliceWidth;
-                }
-                ctx.lineTo(WIDTH, HEIGHT/2);
-                ctx.stroke();
-            }
-            draw();
-        }
-
-        function detectSilence() {
-            if (!analyserNode) return;
-            visualizeAudio(); 
-            const bufferLength = analyserNode.fftSize;
-            const buffer = new Uint8Array(bufferLength);
-            let hasVoice = false;
-            let lastActive = audioContext.currentTime;
-            const detectionStartTime = audioContext.currentTime;
-            let debugCounter = 0;
-            function loop() {
-                if (currentState !== STATE.RECORDING) return;
-                analyserNode.getByteTimeDomainData(buffer);
-                let max = 0;
-                for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
-                const now = audioContext.currentTime;
-                const volDisplay = document.getElementById('vol-display');
-                if (debugCounter++ % 10 === 0) { 
-                    volDisplay.textContent = `(Vol: ${max})`;
-                    if (max > VOICE_THRESHOLD) volDisplay.classList.add('active');
-                    else volDisplay.classList.remove('active');
-                }
-                if (max > VOICE_THRESHOLD) { 
-                    if (!hasVoice) appendLog(`🗣️ 偵測到聲音 (Vol:${max})`);
-                    hasVoice = true;
-                    lastActive = now;
-                }
-                if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
-                    if ((now - detectionStartTime) > LOCK_SECONDS) { 
-                        stopRecording(true);
-                        return;
-                    }
-                }
-                requestAnimationFrame(loop);
-            }
-            requestAnimationFrame(loop);
-        }
-
-        function updateDuration() {
-            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-            document.getElementById('duration-display').textContent = 
-                `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
-        }
-        
-        function startFaceCapture() {
-            capturedImageBlobs = [];
-            captureInterval = setInterval(() => {
-                if (!videoTrack) return;
-                const canvas = document.createElement('canvas');
-                canvas.width = videoTrack.getSettings().width || 640;
-                canvas.height = videoTrack.getSettings().height || 480;
-                canvas.getContext('2d').drawImage(document.getElementById('video-stream'), 0, 0);
-                canvas.toBlob(b => { if(b) capturedImageBlobs.push(b); }, 'image/jpeg', 0.8);
-            }, 1000 / FRAME_RATE);
-        }
-        function stopFaceCapture() { clearInterval(captureInterval); }
-
         async function handleAPIReply(result) {
             document.getElementById('user-text').textContent = result.user_text;
             document.getElementById('assistant-reply').textContent = result.reply;
@@ -524,8 +306,7 @@
             return new Promise(resolve => {
                 audio.onplay = () => { avatar.classList.add('speaking'); };
                 const finish = () => { avatar.classList.remove('speaking'); resolve(); };
-                audio.onended = finish;
-                audio.onerror = finish;
+                audio.onended = finish; audio.onerror = finish;
                 audio.play().catch(finish);
             });
         }
@@ -536,6 +317,7 @@
              const pName = mapP[result.personality] || "未知";
              document.getElementById('personality-display').textContent = `${mapE[result.personality]||'❓'} ${pName}`;
              document.getElementById('personality-mode-tag').textContent = result.new_manual_personality ? '手動' : '自動';
+             document.getElementById('assistant-emoji').textContent = mapE[result.personality]||'❓';
              
              const trendTag = document.getElementById('emotion-trend-tag');
              trendTag.textContent = getTrendMessage(result.emotion_trend);
@@ -543,6 +325,11 @@
              if (result.emotion_trend === 'worsening' || result.emotion_trend === 'persistent_worsening') cssClass = 'worsening'; 
              else if (result.emotion_trend === 'improving' || result.emotion_trend === 'persistent_improving') cssClass = 'improving'; 
              trendTag.className = `status-tag ${cssClass}`;
+
+             // 🟢 顯示計算日誌
+             if (result.calculation_logs) {
+                 document.getElementById('calc-display').textContent = result.calculation_logs.join('\n');
+             }
 
              if(result.emotion_results?.text) {
                  const e = result.emotion_results.text;
@@ -560,8 +347,6 @@
                  document.getElementById('facial-score').textContent = `${(e.confidence*100).toFixed(1)}%`;
                  document.getElementById('facial-frames').textContent = `${e.num_valid_frames}/${e.num_total_frames}`;
              }
-
-             // 🟢 呼叫圖片切換
              loadRemoteImage(result.personality || 'humorous');
         }
 
@@ -572,18 +357,58 @@
             if (trend === 'persistent_improving') return '持續改善 🌟';
             return '穩定 (Stable) ⏸️';
         }
-
         function appendLog(msg, type='info') {
             const div = document.createElement('div');
-            div.className = 'log-item';
-            div.innerHTML = msg;
+            div.className = 'log-item'; div.innerHTML = msg;
             document.getElementById('log-display').prepend(div);
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-             document.getElementById('record-button').addEventListener('click', toggleRecording);
-             checkUrlValidity();
-        });
+        
+        // 輔助函數省略 (checkUrlValidity, getAudioDevices, changeAudioInput, initMediaDevices, setupAudioAnalysis, visualizeAudio, startFaceCapture, stopFaceCapture 同前)
+        // 🟢 修正 detectSilence 邏輯
+        function detectSilence() {
+            if (!analyserNode) return;
+            visualizeAudio(); 
+            const bufferLength = analyserNode.fftSize;
+            const buffer = new Uint8Array(bufferLength);
+            let hasVoice = false;
+            let lastActive = audioContext.currentTime;
+            const detectionStartTime = audioContext.currentTime;
+            let debugCounter = 0;
+            
+            function loop() {
+                if (currentState !== STATE.RECORDING) return;
+                analyserNode.getByteTimeDomainData(buffer);
+                let max = 0;
+                for (let i = 0; i < buffer.length; i++) max = Math.max(max, Math.abs(buffer[i] - 128)); 
+                const now = audioContext.currentTime;
+                const volDisplay = document.getElementById('vol-display');
+                if (debugCounter++ % 10 === 0) { 
+                    volDisplay.textContent = `(Vol: ${max})`;
+                    if (max > VOICE_THRESHOLD) volDisplay.classList.add('active');
+                    else volDisplay.classList.remove('active');
+                }
+                if (max > VOICE_THRESHOLD) { 
+                    if (!hasVoice) appendLog(`🗣️ 偵測到聲音 (Vol:${max})`);
+                    hasVoice = true;
+                    lastActive = now;
+                }
+                // VAD 超時
+                if (hasVoice && (now - lastActive) >= SILENCE_TIMEOUT_SECONDS) {
+                    if ((now - detectionStartTime) > LOCK_SECONDS) { 
+                        stopRecording(true); return;
+                    }
+                }
+                // 🟢 新增：起始無聲超時 (5秒沒講話就掛斷)
+                if (!hasVoice && (now - detectionStartTime) > NO_SPEECH_TIMEOUT) {
+                    appendLog(`🛑 逾時未偵測到聲音 (${NO_SPEECH_TIMEOUT}s)，自動結束。`);
+                    stopRecording(false); return;
+                }
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+        }
+        
+        // 請確保把所有輔助函數補齊 (為節省篇幅省略，請從上一版複製)
     </script>
 </body>
 </html>
