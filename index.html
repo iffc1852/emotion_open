@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 (展示版)</title>
+    <title>AI 多模態助理 (展示版 - 大機器人)</title>
     <style>
         /* --- 全局設定 --- */
         body { 
@@ -11,206 +11,171 @@
             margin: 0; padding: 0; 
             background-color: #f0f2f5; 
             height: 100vh; 
-            overflow: hidden; /* 防止捲動，全螢幕展示 */
+            overflow: hidden; 
         }
 
-        /* 主容器：左右兩欄 */
         .container { 
             display: flex; 
             height: 100vh; 
             width: 100vw;
         }
 
-        /* --- 左側面板 (B區 + C區)：數據核心 --- */
+        /* --- 左側面板 --- */
         .left-panel { 
-            flex: 0 0 35%; /* 佔寬度 35% */
+            flex: 0 0 32%; /* 稍微縮小左邊寬度，留給右邊更多空間 */
             background-color: #ffffff; 
             padding: 20px; 
             display: flex; 
             flex-direction: column; 
             border-right: 2px solid #ddd;
             box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            overflow-y: auto;
+            overflow-y: auto; /* 內容多時可捲動 */
         }
 
-        /* C區：控制與鏡頭 (縮小一點，保留空間給數據) */
+        /* 控制區 */
         .control-section {
             background: #f8f9fa;
             border-radius: 12px;
             padding: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             border: 1px solid #e9ecef;
         }
         
         #camera-preview {
             width: 100%;
-            height: 180px; /* 固定高度，不要佔太多 */
+            height: 150px; /* 縮小一點高度 */
             background-color: #000;
             border-radius: 8px;
             overflow: hidden;
             position: relative;
-            margin-top: 10px;
+            margin-top: 5px;
         }
         #camera-preview video { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 錄音按鈕美化 */
         #record-button {
-            width: 100%;
-            padding: 12px;
-            font-size: 1.1em;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s;
+            width: 100%; padding: 10px; font-size: 1.1em;
+            border-radius: 8px; border: none; cursor: pointer; font-weight: bold;
+            transition: all 0.2s; margin-top: 5px;
         }
         .btn-idle { background-color: #007bff; color: white; }
         .btn-recording { background-color: #dc3545; color: white; animation: pulse 1.5s infinite; }
         .btn-processing { background-color: #ffc107; color: #333; }
 
-        /* B區：核心數據展示 (重點放大) */
+        /* 標題樣式 */
         .dashboard-title {
-            font-size: 1.5em;
-            color: #495057;
+            font-size: 1.4em; color: #495057;
             border-left: 5px solid #007bff;
-            padding-left: 10px;
-            margin: 10px 0;
+            padding-left: 10px; margin: 15px 0 10px 0;
         }
 
+        /* 人格大卡片 */
         .big-card {
             background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 15px; padding: 15px;
+            margin-bottom: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            text-align: center;
-            border: 1px solid #dee2e6;
+            text-align: center; border: 1px solid #dee2e6;
         }
-
-        /* 人格特質超大字體 */
-        .personality-title { font-size: 1.2em; color: #666; margin-bottom: 5px; }
+        .personality-title { font-size: 1.1em; color: #666; margin-bottom: 5px; }
         .personality-value { 
-            font-size: 3.5em; /* 超大 */
-            font-weight: 900; 
-            color: #6f42c1; 
-            line-height: 1.2;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            font-size: 3em; font-weight: 900; color: #6f42c1; 
+            line-height: 1.2; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
         }
-        .personality-mode { font-size: 1em; padding: 5px 15px; border-radius: 20px; background: #e9ecef; display: inline-block; margin-top: 10px;}
+        .personality-mode { font-size: 0.9em; padding: 4px 12px; border-radius: 20px; background: #e9ecef; display: inline-block; margin-top: 5px;}
 
-        /* 情緒數據卡片 */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: 1fr; /* 單欄顯示，為了更清楚 */
-            gap: 15px;
-        }
-
+        /* 情緒分數卡片 */
+        .metrics-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
         .metric-item {
-            background: white;
+            background: white; padding: 12px;
+            border-radius: 10px; border-left: 6px solid #ccc;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .metric-label { font-size: 1.3em; font-weight: bold; color: #333; }
+        .metric-value { font-size: 1.6em; font-weight: bold; color: #007bff; }
+        .border-text { border-left-color: #ffc107; }
+        .border-audio { border-left-color: #28a745; }
+        .border-face { border-left-color: #dc3545; }
+
+        /* --- 新增：運算過程顯示卡片 (Terminal 風格) --- */
+        .calc-card {
+            background-color: #2d2d2d; /* 深色背景 */
+            color: #00ff00;            /* 駭客綠字體 */
+            font-family: 'Consolas', 'Monaco', monospace; /* 等寬字體 */
             padding: 15px;
-            border-radius: 10px;
-            border-left: 6px solid #ccc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .metric-label { font-size: 1.5em; font-weight: bold; color: #333; }
-        .metric-value { font-size: 2em; font-weight: bold; color: #007bff; }
-        
-        /* 不同模態的顏色標記 */
-        .border-text { border-left-color: #ffc107; }   /* 黃色 - 文字 */
-        .border-audio { border-left-color: #28a745; }  /* 綠色 - 聲音 */
-        .border-face { border-left-color: #dc3545; }   /* 紅色 - 臉部 */
-
-        /* 隱藏計算細節，只留標題 */
-        .calc-box-minimized {
-            font-size: 0.8em; color: #aaa; cursor: pointer;
-            border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;        /* 字體適中 */
+            white-space: pre-wrap;     /* 保留換行 */
+            line-height: 1.4;
+            border-left: 6px solid #6f42c1; /* 紫色邊框呼應人格 */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            min-height: 100px;
         }
 
-        /* --- 右側面板 (F區)：視覺與對話 --- */
+        /* --- 右側面板 (放大機器人) --- */
         .right-panel {
-            flex: 1; /* 佔剩餘空間 (65%) */
+            flex: 1; /* 佔據剩餘空間 */
             background-color: #f4f7f9;
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* 垂直排列 */
             position: relative;
-            align-items: center;
-            justify-content: center;
+            overflow: hidden;
         }
 
-        /* E區：機器人頭像 (置中放大) */
+        /* 機器人區域：設為 flex: 1 自動填滿高度 */
         #avatar-display {
-            width: 80%;
-            height: 60vh; /* 佔畫面高度 60% */
+            flex: 1; 
+            width: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: all 0.5s ease;
+            padding: 20px;
+            box-sizing: border-box;
+            /* 讓圖片垂直置中 */
         }
         
         #assistant-avatar {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2));
+            width: 100%;       /* 寬度盡量撐滿 */
+            height: 100%;      /* 高度盡量撐滿 */
+            max-height: 80vh;  /* 限制最大高度，避免跑版 */
+            object-fit: contain; /* 保持比例，不會變形 */
+            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.25)); /* 加強陰影立體感 */
             transition: transform 0.2s;
         }
 
-        /* 說話時的動畫 */
-        .speaking { animation: bounce-speak 0.5s infinite alternate; }
-        @keyframes bounce-speak { from { transform: scale(1); } to { transform: scale(1.05); } }
+        /* 說話動畫：放大更明顯 */
+        .speaking { animation: bounce-speak 0.6s infinite alternate; }
+        @keyframes bounce-speak { 
+            from { transform: scale(1); filter: drop-shadow(0 15px 30px rgba(0,0,0,0.25)); } 
+            to { transform: scale(1.08); filter: drop-shadow(0 20px 40px rgba(111, 66, 193, 0.4)); } 
+        }
 
-        /* D區：對話泡泡 (只顯示當前) */
+        /* 對話區：固定在底部 */
         #current-dialogue-area {
-            position: absolute;
-            bottom: 40px;
-            width: 90%;
-            min-height: 20vh;
+            width: 100%;
+            min-height: 120px; /* 保留底部空間 */
+            padding-bottom: 30px;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
-            gap: 20px;
+            align-items: center;
+            gap: 15px;
+            z-index: 10; /* 確保浮在最上層 */
         }
 
         .bubble {
-            padding: 20px 30px;
-            border-radius: 20px;
-            font-size: 2em; /* 字體加大 */
+            padding: 15px 30px;
+            border-radius: 50px; /* 圓潤氣泡 */
+            font-size: 1.8em;    /* 大字體 */
             font-weight: bold;
-            max-width: 80%;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            opacity: 0;
-            transform: translateY(20px);
-            animation: popIn 0.5s forwards;
-            line-height: 1.4;
+            max-width: 85%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        @keyframes popIn { from{opacity:0; transform: translateY(20px) scale(0.9);} to{opacity:1; transform: translateY(0) scale(1);} }
 
-        @keyframes popIn { to { opacity: 1; transform: translateY(0); } }
-
-        /* 使用者對話 (右邊) */
-        .user-bubble {
-            align-self: flex-end;
-            background-color: #007bff;
-            color: white;
-            border-bottom-right-radius: 5px;
-        }
-
-        /* 機器人回應 (左邊) */
-        .bot-bubble {
-            align-self: flex-start;
-            background-color: #ffffff;
-            color: #333;
-            border-bottom-left-radius: 5px;
-            border: 2px solid #007bff;
-        }
-
-        /* 輔助文字 */
-        .bubble-label { font-size: 0.5em; opacity: 0.7; display: block; margin-bottom: 5px; font-weight: normal;}
-
-        /* Log隱藏，只在除錯用 */
-        #debug-log { display: none; }
+        .user-bubble { background-color: #007bff; color: white; border-bottom-right-radius: 5px; align-self: flex-end; margin-right: 5%;}
+        .bot-bubble { background-color: #fff; color: #333; border: 3px solid #007bff; border-bottom-left-radius: 5px; align-self: flex-start; margin-left: 5%;}
 
     </style>
 </head>
@@ -219,22 +184,18 @@
 <div class="container">
     <div class="left-panel">
         <div class="control-section">
-            <h3 style="margin:0 0 10px 0;">🔌 連線與控制</h3>
+            <h3 style="margin:0 0 5px 0; font-size:1em;">🔌 連線與控制</h3>
             <div style="display:flex; gap:5px;">
-                <input type="text" id="tunnel-url" placeholder="輸入 Cloudflare URL" style="flex:1; padding:8px;">
-                <button onclick="manualConnect()" style="padding:8px; cursor:pointer;">連線</button>
+                <input type="text" id="tunnel-url" placeholder="輸入 URL" style="flex:1; padding:5px;">
+                <button onclick="manualConnect()" style="cursor:pointer;">連線</button>
             </div>
-            
             <div id="camera-preview">
                 <video id="video-stream" autoplay muted></video>
-                <canvas id="audio-visualizer" style="position:absolute; bottom:0; left:0; width:100%; height:40px;"></canvas>
+                <canvas id="audio-visualizer" style="position:absolute; bottom:0; left:0; width:100%; height:30px;"></canvas>
             </div>
-            
-            <div style="margin-top:10px;">
-                <button id="record-button" class="btn-idle" onclick="toggleRecording()" disabled>
-                    <span id="record-text">等待連線...</span>
-                </button>
-            </div>
+            <button id="record-button" class="btn-idle" onclick="toggleRecording()" disabled>
+                <span id="record-text">等待連線...</span>
+            </button>
         </div>
 
         <div class="dashboard-title">🧠 核心人格狀態</div>
@@ -244,25 +205,25 @@
             <div id="personality-mode-tag" class="personality-mode">自動模式 (Auto)</div>
         </div>
 
-        <div class="dashboard-title">📊 多模態情緒分析</div>
+        <div class="dashboard-title">📊 多模態情緒分數</div>
         <div class="metrics-grid">
             <div class="metric-item border-text">
-                <span class="metric-label">📝 文字情緒</span>
+                <span class="metric-label">📝 文字</span>
                 <span id="text-emotion-display" class="metric-value">--</span>
             </div>
             <div class="metric-item border-audio">
-                <span class="metric-label">🎤 語音情緒</span>
+                <span class="metric-label">🎤 語音</span>
                 <span id="audio-emotion-display" class="metric-value">--</span>
             </div>
             <div class="metric-item border-face">
-                <span class="metric-label">🎭 臉部情緒</span>
+                <span class="metric-label">🎭 臉部</span>
                 <span id="facial-emotion-display" class="metric-value">--</span>
             </div>
         </div>
 
-        <div class="calc-box-minimized" onclick="alert(document.getElementById('hidden-calc').innerText)">
-            ℹ️ 點擊查看詳細權重計算過程
-            <div id="hidden-calc" style="display:none;"></div>
+        <div class="dashboard-title">🧮 決策計算過程</div>
+        <div id="calc-display-area" class="calc-card">
+            (等待第一次互動運算...)
         </div>
     </div>
 
@@ -275,13 +236,11 @@
             </div>
         
         <audio id="tts-audio" class="hidden"></audio>
-        <div id="debug-log"></div>
     </div>
 </div>
 
 <script>
-    /* --- 邏輯部分 (保留原本功能，僅修改 UI 更新邏輯) --- */
-    
+    /* --- 邏輯部分 --- */
     const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
     let currentState = STATE.IDLE;
     let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode;
@@ -289,28 +248,24 @@
     let CURRENT_BASE_URL = null;
     let ignoreClicksUntil = 0;
 
-    // 基本參數
     const VOICE_THRESHOLD = 5;      
     const SILENCE_TIMEOUT = 2.5;     
     const FRAME_RATE = 1;            
 
-    // 初始化與連線
     async function manualConnect() {
         const url = document.getElementById('tunnel-url').value.trim();
         if(!url) return alert("請輸入網址");
-        
         try {
-            // 測試圖片
             const testImg = new Image();
             testImg.src = `${url}/static/image/humorous.png`;
             testImg.onload = () => {
                 CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
                 document.getElementById('record-button').disabled = false;
                 document.getElementById('record-text').textContent = "點擊開始 (Click to Start)";
-                loadAvatar('humorous'); // 預設圖片
+                loadAvatar('humorous'); 
                 initMedia();
             };
-            testImg.onerror = () => alert("連線失敗，請檢查網址");
+            testImg.onerror = () => alert("連線失敗");
         } catch(e) { alert("錯誤: " + e.message); }
     }
 
@@ -321,7 +276,7 @@
             document.getElementById('video-stream').srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
             setupAudioVisualizer(stream);
-        } catch(e) { console.error(e); alert("無法取得麥克風或鏡頭權限"); }
+        } catch(e) { console.error(e); alert("無法取得權限"); }
     }
 
     function setupAudioVisualizer(stream) {
@@ -338,79 +293,54 @@
         const ctx = canvas.getContext('2d');
         const bufferLength = analyserNode.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
-        
         const draw = () => {
             requestAnimationFrame(draw);
             analyserNode.getByteFrequencyData(dataArray);
-            ctx.fillStyle = '#f8f9fa'; 
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // 簡單的綠色波形
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             const barWidth = (canvas.width / bufferLength) * 2.5;
             let x = 0;
             for(let i = 0; i < bufferLength; i++) {
                 const barHeight = dataArray[i] / 2;
-                ctx.fillStyle = `rgb(50, ${barHeight + 100}, 50)`;
+                ctx.fillStyle = `rgb(0, 255, 0)`;
                 ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
                 x += barWidth + 1;
             }
-            
-            // 簡易 VAD 檢查
-            let sum = 0;
-            for(let i=0; i<bufferLength; i++) sum += dataArray[i];
-            const avg = sum / bufferLength;
-            if(currentState === STATE.RECORDING && avg > VOICE_THRESHOLD) {
-                lastSpeechTime = Date.now();
-            }
+            // VAD 邏輯
+            let sum = 0; for(let i=0; i<bufferLength; i++) sum += dataArray[i];
+            if(currentState === STATE.RECORDING && (sum/bufferLength) > VOICE_THRESHOLD) lastSpeechTime = Date.now();
         };
         draw();
     }
 
-    // 錄音控制
     let lastSpeechTime = 0;
     let silenceTimer = null;
 
     function toggleRecording() {
         if(Date.now() < ignoreClicksUntil) return;
-        
-        if(currentState === STATE.IDLE) {
-            startRecording();
-        } else if(currentState === STATE.RECORDING) {
-            stopRecording();
-        }
+        if(currentState === STATE.IDLE) startRecording();
+        else if(currentState === STATE.RECORDING) stopRecording();
     }
 
     function updateBtnState(state) {
         currentState = state;
         const btn = document.getElementById('record-button');
         const txt = document.getElementById('record-text');
-        
         if(state === STATE.IDLE) {
-            btn.className = 'btn-idle';
-            txt.textContent = "點擊開始 (Click to Start)";
-            btn.disabled = false;
+            btn.className = 'btn-idle'; txt.textContent = "點擊開始"; btn.disabled = false;
         } else if(state === STATE.RECORDING) {
-            btn.className = 'btn-recording';
-            txt.textContent = "聆聽中... (Listening)";
-            btn.disabled = false;
+            btn.className = 'btn-recording'; txt.textContent = "聆聽中... (VAD)"; btn.disabled = false;
         } else if(state === STATE.PROCESSING) {
-            btn.className = 'btn-processing';
-            txt.textContent = "AI 思考中... (Thinking)";
-            btn.disabled = true;
+            btn.className = 'btn-processing'; txt.textContent = "運算中..."; btn.disabled = true;
         }
     }
 
     function startRecording() {
         updateBtnState(STATE.RECORDING);
-        audioChunks = [];
-        capturedImageBlobs = [];
-        
+        audioChunks = []; capturedImageBlobs = [];
         mediaRecorder = new MediaRecorder(audioStream);
         mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
         mediaRecorder.onstop = uploadData;
         mediaRecorder.start();
-
-        // 啟動拍照
         captureInterval = setInterval(() => {
             if(!videoTrack) return;
             const cvs = document.createElement('canvas');
@@ -418,11 +348,8 @@
             cvs.getContext('2d').drawImage(document.getElementById('video-stream'), 0, 0);
             cvs.toBlob(b => capturedImageBlobs.push(b), 'image/jpeg', 0.8);
         }, 1000/FRAME_RATE);
-
-        // VAD 靜音檢測 Loop
         lastSpeechTime = Date.now();
-        ignoreClicksUntil = Date.now() + 1000; // 防誤觸
-        
+        ignoreClicksUntil = Date.now() + 1000;
         silenceTimer = setInterval(() => {
             if(Date.now() - lastSpeechTime > SILENCE_TIMEOUT * 1000) {
                 if(Date.now() > ignoreClicksUntil) stopRecording(); 
@@ -432,100 +359,65 @@
 
     function stopRecording() {
         if(currentState !== STATE.RECORDING) return;
-        clearInterval(captureInterval);
-        clearInterval(silenceTimer);
+        clearInterval(captureInterval); clearInterval(silenceTimer);
         mediaRecorder.stop();
         updateBtnState(STATE.PROCESSING);
     }
 
     async function uploadData() {
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        if(audioBlob.size < 1000) { 
-            console.log("Audio too small"); 
-            updateBtnState(STATE.IDLE); 
-            return; 
-        }
-
+        if(audioBlob.size < 1000) { updateBtnState(STATE.IDLE); return; }
         const fd = new FormData();
         fd.append('audio_file', audioBlob);
         capturedImageBlobs.forEach((b, i) => fd.append(`image_${i}`, b, `frame_${i}.jpg`));
         fd.append('turn_data', JSON.stringify({ session_id: 'demo_01', history: [] }));
-
         try {
             const res = await fetch(`${CURRENT_BASE_URL}/api/v1/process`, { method: 'POST', body: fd });
-            const data = await res.json();
-            handleResult(data);
-        } catch(e) {
-            console.error(e);
-            alert("上傳失敗");
-            updateBtnState(STATE.IDLE);
-        }
+            handleResult(await res.json());
+        } catch(e) { alert("上傳失敗"); updateBtnState(STATE.IDLE); }
     }
 
-    // --- 介面更新邏輯 (針對你要求的 B, D, E, F 區) ---
     function handleResult(data) {
-        // 1. 更新 D區：對話泡泡 (只顯示當前)
+        // 更新對話
         const chatArea = document.getElementById('current-dialogue-area');
         chatArea.innerHTML = `
-            <div class="bubble user-bubble">
-                <span class="bubble-label">User</span>
-                ${data.user_text || "..."}
-            </div>
-            <div class="bubble bot-bubble">
-                <span class="bubble-label">Bot</span>
-                ${data.reply || "..."}
-            </div>
+            <div class="bubble user-bubble">${data.user_text || "..."}</div>
+            <div class="bubble bot-bubble">${data.reply || "..."}</div>
         `;
-
-        // 2. 更新 B區：大字體數據
+        
+        // 更新左側數據
         const mapE = { "comforting": "🤗 安撫", "cheerful": "😄 開朗", "humorous": "😆 幽默", "gentle": "💝 溫柔", "rational": "🤔 理性", "encouraging": "💪 鼓勵" };
         const pName = mapE[data.personality] || data.personality;
-        
         document.getElementById('personality-display').textContent = pName;
         document.getElementById('personality-mode-tag').textContent = data.new_manual_personality ? "手動介入" : "自動演算";
-        
-        // 更新卡片數字
+
         if(data.emotion_results) {
-            if(data.emotion_results.text) 
-                document.getElementById('text-emotion-display').textContent = `${data.emotion_results.text.emotion} ${(data.emotion_results.text.score*100).toFixed(0)}%`;
-            if(data.emotion_results.audio) 
-                document.getElementById('audio-emotion-display').textContent = `${data.emotion_results.audio.emotion} ${(data.emotion_results.audio.score*100).toFixed(0)}%`;
-            if(data.emotion_results.facial) 
-                document.getElementById('facial-emotion-display').textContent = `${data.emotion_results.facial.emotion} ${(data.emotion_results.facial.confidence*100).toFixed(0)}%`;
+            if(data.emotion_results.text) document.getElementById('text-emotion-display').textContent = `${data.emotion_results.text.emotion} ${(data.emotion_results.text.score*100).toFixed(0)}%`;
+            if(data.emotion_results.audio) document.getElementById('audio-emotion-display').textContent = `${data.emotion_results.audio.emotion} ${(data.emotion_results.audio.score*100).toFixed(0)}%`;
+            if(data.emotion_results.facial) document.getElementById('facial-emotion-display').textContent = `${data.emotion_results.facial.emotion} ${(data.emotion_results.facial.confidence*100).toFixed(0)}%`;
         }
 
-        // 隱藏的計算過程
-        if(data.calculation_logs) document.getElementById('hidden-calc').innerText = data.calculation_logs.join('\n');
+        // 更新計算顯示 (直接秀出)
+        if(data.calculation_logs) {
+            document.getElementById('calc-display-area').textContent = data.calculation_logs.join('\n');
+        }
 
-        // 3. 更新 E -> F區：頭像
         loadAvatar(data.personality);
-        
-        // 4. 播放聲音
         if(data.tts_audio_file) playAudio(data.tts_audio_file);
         else updateBtnState(STATE.IDLE);
     }
 
     function loadAvatar(personality) {
-        const img = document.getElementById('assistant-avatar');
-        img.src = `${CURRENT_BASE_URL}/static/image/${personality || 'humorous'}.png`;
+        document.getElementById('assistant-avatar').src = `${CURRENT_BASE_URL}/static/image/${personality || 'humorous'}.png`;
     }
 
     function playAudio(filename) {
         const audio = document.getElementById('tts-audio');
         const avatar = document.getElementById('assistant-avatar');
-        
         audio.src = `${CURRENT_BASE_URL}/api/v1/audio-download?filename=${filename}`;
-        
         audio.onplay = () => avatar.classList.add('speaking');
-        audio.onended = () => {
-            avatar.classList.remove('speaking');
-            updateBtnState(STATE.IDLE);
-        };
-        audio.onerror = () => {
-             avatar.classList.remove('speaking');
-             updateBtnState(STATE.IDLE);
-        };
-        
+        audio.onended = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
+        audio.onerror = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
         audio.play();
     }
 </script>
