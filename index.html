@@ -3,424 +3,618 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理</title>
+    <title>AI 多模態情緒助理</title>
     <style>
-        /* --- 全局設定 --- */
+        /* --- 1. 全局設定 --- */
         body { 
-            font-family: '微軟正黑體', 'Segoe UI', sans-serif; 
+            font-family: '微軟正黑體', 'Segoe UI', sans-serif;
             margin: 0; padding: 0; 
-            background-color: #f0f2f5; 
+            background-color: #f4f7f9; 
             height: 100vh; 
-            overflow: hidden; 
-        }
-
-        .container { 
-            display: flex; 
-            height: 100vh; 
-            width: 100vw;
-        }
-
-        /* --- 左側面板 --- */
-        .left-panel { 
-            flex: 0 0 32%; /* 稍微縮小左邊寬度，留給右邊更多空間 */
-            background-color: #ffffff; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            border-right: 2px solid #ddd;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            overflow-y: auto; /* 內容多時可捲動 */
-        }
-
-        /* 控制區 */
-        .control-section {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #e9ecef;
-        }
-        
-        #camera-preview {
-            width: 100%;
-            height: 150px; /* 縮小一點高度 */
-            background-color: #000;
-            border-radius: 8px;
-            overflow: hidden;
-            position: relative;
-            margin-top: 5px;
-        }
-        #camera-preview video { width: 100%; height: 100%; object-fit: cover; }
-        
-        #record-button {
-            width: 100%; padding: 10px; font-size: 1.1em;
-            border-radius: 8px; border: none; cursor: pointer; font-weight: bold;
-            transition: all 0.2s; margin-top: 5px;
-        }
-        .btn-idle { background-color: #007bff; color: white; }
-        .btn-recording { background-color: #dc3545; color: white; animation: pulse 1.5s infinite; }
-        .btn-processing { background-color: #ffc107; color: #333; }
-
-        /* 標題樣式 */
-        .dashboard-title {
-            font-size: 1.4em; color: #495057;
-            border-left: 5px solid #007bff;
-            padding-left: 10px; margin: 15px 0 10px 0;
-        }
-
-        /* 人格大卡片 */
-        .big-card {
-            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-            border-radius: 15px; padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            text-align: center; border: 1px solid #dee2e6;
-        }
-        .personality-title { font-size: 1.1em; color: #666; margin-bottom: 5px; }
-        .personality-value { 
-            font-size: 3em; font-weight: 900; color: #6f42c1; 
-            line-height: 1.2; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-        }
-        .personality-mode { font-size: 0.9em; padding: 4px 12px; border-radius: 20px; background: #e9ecef; display: inline-block; margin-top: 5px;}
-
-        /* 情緒分數卡片 */
-        .metrics-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        .metric-item {
-            background: white; padding: 12px;
-            border-radius: 10px; border-left: 6px solid #ccc;
-            display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .metric-label { font-size: 1.3em; font-weight: bold; color: #333; }
-        .metric-value { font-size: 1.6em; font-weight: bold; color: #007bff; }
-        .border-text { border-left-color: #ffc107; }
-        .border-audio { border-left-color: #28a745; }
-        .border-face { border-left-color: #dc3545; }
-
-        /* --- 新增：運算過程顯示卡片 (Terminal 風格) --- */
-        .calc-card {
-            background-color: #2d2d2d; /* 深色背景 */
-            color: #00ff00;            /* 駭客綠字體 */
-            font-family: 'Consolas', 'Monaco', monospace; /* 等寬字體 */
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 0.85rem;        /* 字體適中 */
-            white-space: pre-wrap;     /* 保留換行 */
-            line-height: 1.4;
-            border-left: 6px solid #6f42c1; /* 紫色邊框呼應人格 */
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-            min-height: 100px;
-        }
-
-        /* --- 右側面板 (放大機器人) --- */
-        .right-panel {
-            flex: 1; /* 佔據剩餘空間 */
-            background-color: #f4f7f9;
-            display: flex;
-            flex-direction: column; /* 垂直排列 */
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* 機器人區域：設為 flex: 1 自動填滿高度 */
-        #avatar-display {
-            flex: 1; 
-            width: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            color: #333;
+        }
+
+        /* --- 主容器 --- */
+        .main-container {
+            width: 1200px; /*稍微加寬*/
+            max-width: 98vw;
+            height: 90vh;
+            background-color: #fff;
+            border-radius: 20px;
+            /* 柔和深陰影取代邊框 */
+            box-shadow: 0 15px 40px rgba(0,0,0,0.12); 
+            display: grid;
+            grid-template-columns: 400px 1fr; /* 左側固定寬度，右側自適應 */
+            gap: 30px;
+            padding: 40px;
             box-sizing: border-box;
-            /* 讓圖片垂直置中 */
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- 頂部連線列 (補回) --- */
+        .connection-bar {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            background: rgba(40, 44, 52, 0.95);
+            padding: 10px;
+            text-align: center;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            transform: translateY(-85%); /* 平常隱藏，滑鼠移上去顯示 */
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .connection-bar:hover { transform: translateY(0); }
+        .connection-bar span { color: #fff; font-weight: bold; font-size: 0.9rem; }
+        .connection-bar input { 
+            padding: 8px 15px; border-radius: 20px; border:none; width: 350px; outline: none; font-size: 0.9rem;
+        }
+        .connection-bar button { 
+            cursor: pointer; background: #007bff; color: white; border: none; 
+            padding: 8px 20px; border-radius: 20px; font-weight: bold; 
+            transition: background 0.2s;
+        }
+        .connection-bar button:hover { background: #0056b3; }
+
+        /* --- 標題 --- */
+        h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.1em;
+            color: #555;
+            font-weight: 700;
+            border-left: 5px solid #007bff;
+            padding-left: 12px;
+        }
+
+        /* ================= 左側區域 ================= */
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
+        /* 1. 語音輸入區 (加大) */
+        .video-container-wrapper {
+            flex: 1.5; /* 讓這裡佔比變大 (1.5 vs 1) */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-box {
+            flex: 1; /* 填滿 wrapper */
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.06); 
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #camera-preview {
+            width: 100%; 
+            height: 100%; /* 撐滿 */
+            background-color: #222; 
+            border-radius: 12px;
+            overflow: hidden; 
+            position: relative;
+        }
+        #camera-preview video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+        #record-button {
+            width: 100%; margin-top: 15px; padding: 15px;
+            border-radius: 12px; border: none; font-weight: bold; font-size: 1.1em;
+            cursor: pointer; transition: all 0.2s; text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+        .btn-idle { background-color: #fff; color: #007bff; border: 2px solid #eef2f7 !important; }
+        .btn-recording { background-color: #ff4757; color: white; animation: pulse 1.5s infinite; }
+        .btn-processing { background-color: #ffa502; color: white; }
+
+        /* 2. 文字輸入區 (縮小) */
+        .text-container-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .text-input-box {
+            background: #fcfcfc;
+            border-radius: 16px;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.02); 
+            border: 1px solid #f0f0f0;
+        }
+        
+        #user-text-mirror {
+            flex: 1;
+            background: transparent;
+            font-size: 1.1em;
+            color: #444;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            font-style: italic;
+            line-height: 1.6;
+        }
+
+        .visualizer-container {
+            height: 50px;
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+            border: 1px solid #eee;
+        }
+        #audio-visualizer { width: 100%; height: 100%; }
+
+
+        /* ================= 右側區域 ================= */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            height: 100%;
+            position: relative;
+        }
+
+        /* 1. 情緒感知 (進度條 + 標籤) */
+        .emotion-section {
+            background: #fff;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+        }
+
+        .progress-row { display: flex; align-items: center; margin-bottom: 18px; }
+        .progress-row:last-child { margin-bottom: 0; }
+        
+        .progress-label { width: 50px; font-weight: bold; color: #666; font-size: 1rem; }
+        
+        .progress-track {
+            flex: 1; height: 12px; background-color: #f0f2f5;
+            border-radius: 10px; overflow: hidden; margin: 0 15px;
+        }
+        .progress-bar { height: 100%; width: 0%; border-radius: 10px; transition: width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        
+        .bar-text { background: linear-gradient(90deg, #f6d365, #fda085); } 
+        .bar-audio { background: linear-gradient(90deg, #84fab0, #8fd3f4); }
+        .bar-face { background: linear-gradient(90deg, #ff9a9e, #fecfef); }
+        
+        /* 修改這裡：讓右側顯示更多資訊 */
+        .progress-info { 
+            width: 140px; /* 加寬以容納文字 */
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+        }
+        .emotion-name {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .emotion-percent {
+            font-size: 1.1em;
+            font-weight: 800;
+            color: #333;
+            min-width: 45px;
+            text-align: right;
+        }
+
+        /* 2. 決策與人格 */
+        .decision-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+        }
+        .personality-tag {
+            background: #f8f9fa; padding: 6px 15px; border-radius: 20px; 
+            font-size: 0.9em; color: #555; border: 1px solid #eee;
+        }
+        #personality-display { color: #6f42c1; font-weight: 800; font-size: 1.2em; margin-left: 8px; }
+
+        .calc-section {
+            background-color: #282c34; color: #98c379;
+            border-radius: 12px; padding: 15px;
+            font-family: 'Consolas', monospace; font-size: 0.85em;
+            height: 110px; overflow-y: auto;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+            line-height: 1.4;
+        }
+
+        /* 3. AI 舞台 */
+        .avatar-section {
+            flex: 1;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08); 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+            margin-top: 10px;
         }
         
         #assistant-avatar {
-            width: 100%;       /* 寬度盡量撐滿 */
-            height: 100%;      /* 高度盡量撐滿 */
-            max-height: 80vh;  /* 限制最大高度，避免跑版 */
-            object-fit: contain; /* 保持比例，不會變形 */
-            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.25)); /* 加強陰影立體感 */
-            transition: transform 0.2s;
+            max-width: 90%; max-height: 90%; object-fit: contain;
+            transition: transform 0.2s; filter: drop-shadow(0 15px 30px rgba(0,0,0,0.15));
+            z-index: 1;
         }
+        .speaking { animation: bounce 0.6s infinite alternate; }
+        @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.05); } }
 
-        /* 說話動畫：放大更明顯 */
-        .speaking { animation: bounce-speak 0.6s infinite alternate; }
-        @keyframes bounce-speak { 
-            from { transform: scale(1); filter: drop-shadow(0 15px 30px rgba(0,0,0,0.25)); } 
-            to { transform: scale(1.08); filter: drop-shadow(0 20px 40px rgba(111, 66, 193, 0.4)); } 
-        }
-
-        /* 對話區：固定在底部 */
-        #current-dialogue-area {
-            width: 100%;
-            min-height: 120px; /* 保留底部空間 */
-            padding-bottom: 30px;
+        /* 懸浮對話框 */
+        .ai-bubble-container {
+            position: absolute;
+            bottom: 30px; 
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(8px);
+            padding: 20px 30px;
+            border-radius: 15px;
+            border: 1px solid rgba(0,0,0,0.05);
+            min-height: 50px;
             display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            align-items: center;
-            gap: 15px;
-            z-index: 10; /* 確保浮在最上層 */
+            align-items: center; justify-content: center; text-align: center;
+            font-weight: bold; font-size: 1.3em; color: #333;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            opacity: 0; transition: all 0.4s ease;
+            transform: translateY(20px);
+            max-width: 80%;
+            z-index: 10;
         }
+        .ai-bubble-container.show { opacity: 1; transform: translateY(0); }
 
-        .bubble {
-            padding: 15px 30px;
-            border-radius: 50px; /* 圓潤氣泡 */
-            font-size: 1.8em;    /* 大字體 */
-            font-weight: bold;
-            max-width: 85%;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
-            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes popIn { from{opacity:0; transform: translateY(20px) scale(0.9);} to{opacity:1; transform: translateY(0) scale(1);} }
-
-        .user-bubble { background-color: #007bff; color: white; border-bottom-right-radius: 5px; align-self: flex-end; margin-right: 5%;}
-        .bot-bubble { background-color: #fff; color: #333; border: 3px solid #007bff; border-bottom-left-radius: 5px; align-self: flex-start; margin-left: 5%;}
+        /* 隱藏區 */
+        .logic-holder { position: absolute; opacity: 0; pointer-events: none; height: 0; width: 0; }
+        #current-dialogue-area { opacity: 0; height: 0; position: absolute; }
+        .hidden-data { display: none; }
 
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="left-panel">
-        <div class="control-section">
-            <h3 style="margin:0 0 5px 0; font-size:1em;">🔌 連線與控制</h3>
-            <div style="display:flex; gap:5px;">
-                <input type="text" id="tunnel-url" placeholder="輸入 URL" style="flex:1; padding:5px;">
-                <button onclick="manualConnect()" style="cursor:pointer;">連線</button>
-            </div>
-            <div id="camera-preview">
-                <video id="video-stream" autoplay muted></video>
-                <canvas id="audio-visualizer" style="position:absolute; bottom:0; left:0; width:100%; height:30px;"></canvas>
-            </div>
-            <button id="record-button" class="btn-idle" onclick="toggleRecording()" disabled>
-                <span id="record-text">等待連線...</span>
-            </button>
-        </div>
-
-        <div class="dashboard-title">🧠 核心人格狀態</div>
-        <div class="big-card">
-            <div class="personality-title">當前人格模式</div>
-            <div id="personality-display" class="personality-value">等待中...</div>
-            <div id="personality-mode-tag" class="personality-mode">自動模式 (Auto)</div>
-        </div>
-
-        <div class="dashboard-title">📊 多模態情緒分數</div>
-        <div class="metrics-grid">
-            <div class="metric-item border-text">
-                <span class="metric-label">📝 文字</span>
-                <span id="text-emotion-display" class="metric-value">--</span>
-            </div>
-            <div class="metric-item border-audio">
-                <span class="metric-label">🎤 語音</span>
-                <span id="audio-emotion-display" class="metric-value">--</span>
-            </div>
-            <div class="metric-item border-face">
-                <span class="metric-label">🎭 臉部</span>
-                <span id="facial-emotion-display" class="metric-value">--</span>
-            </div>
-        </div>
-
-        <div class="dashboard-title">🧮 決策計算過程</div>
-        <div id="calc-display-area" class="calc-card">
-            (等待第一次互動運算...)
-        </div>
+    <div class="connection-bar">
+        <span>⚙️ 連線設定: </span>
+        <input type="text" id="tunnel-url" placeholder="請貼上 Cloudflare Tunnel 網址...">
+        <button onclick="manualConnect()">確認連線</button>
     </div>
 
-    <div class="right-panel">
-        <div id="avatar-display">
-            <img id="assistant-avatar" src="" alt="AI Avatar">
-        </div>
-
-        <div id="current-dialogue-area">
-            </div>
+    <div class="main-container">
         
-        <audio id="tts-audio" class="hidden"></audio>
+        <div class="left-column">
+            
+            <div class="video-container-wrapper">
+                <h3>語音輸入</h3>
+                <div class="video-box">
+                    <div id="camera-preview">
+                        <video id="video-stream" autoplay muted></video>
+                    </div>
+                    <button id="record-button" class="btn-idle" onclick="toggleRecording()" disabled>
+                        <span id="record-text">等待連線...</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="text-container-wrapper">
+                <h3>文字輸入</h3>
+                <div class="text-input-box">
+                    <div id="user-text-mirror">(等待對話...)</div>
+                    <div class="visualizer-container">
+                        <canvas id="audio-visualizer"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-column">
+            
+            <div>
+                <h3>多模態情緒感知</h3>
+                <div class="emotion-section">
+                    
+                    <div class="progress-row">
+                        <div class="progress-label">文字</div>
+                        <div class="progress-track"><div class="progress-bar bar-text" id="bar-text-visual"></div></div>
+                        <div class="progress-info">
+                            <span id="label-text-visual" class="emotion-name">--</span>
+                            <span id="val-text-visual" class="emotion-percent">0%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-row">
+                        <div class="progress-label">語音</div>
+                        <div class="progress-track"><div class="progress-bar bar-audio" id="bar-audio-visual"></div></div>
+                        <div class="progress-info">
+                            <span id="label-audio-visual" class="emotion-name">--</span>
+                            <span id="val-audio-visual" class="emotion-percent">0%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-row">
+                        <div class="progress-label">臉部</div>
+                        <div class="progress-track"><div class="progress-bar bar-face" id="bar-face-visual"></div></div>
+                        <div class="progress-info">
+                            <span id="label-face-visual" class="emotion-name">--</span>
+                            <span id="val-face-visual" class="emotion-percent">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="hidden-data">
+                        <span id="text-emotion-display">--</span>
+                        <span id="audio-emotion-display">--</span>
+                        <span id="facial-emotion-display">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="flex-shrink: 0;">
+                <div class="decision-header">
+                    <h3>決策計算過程</h3>
+                    <div class="personality-tag">
+                        當前: <span id="personality-display">--</span> 
+                        <span id="personality-mode-tag">(Auto)</span>
+                    </div>
+                </div>
+                <div id="calc-display-area" class="calc-section">
+                    > System ready...
+                </div>
+            </div>
+
+            <div class="avatar-section">
+                <img id="assistant-avatar" src="" alt="AI Avatar">
+                
+                <div id="ai-bubble-mirror" class="ai-bubble-container">
+                    ...
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
-<script>
-    /* --- 邏輯部分 --- */
-    const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
-    let currentState = STATE.IDLE;
-    let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode;
-    let audioChunks = [], capturedImageBlobs = [], captureInterval;
-    let CURRENT_BASE_URL = null;
-    let ignoreClicksUntil = 0;
+    <div class="logic-holder">
+        <div id="current-dialogue-area"></div>
+        <audio id="tts-audio"></audio>
+    </div>
 
-    const VOICE_THRESHOLD = 5;      
-    const SILENCE_TIMEOUT = 2.5;     
-    const FRAME_RATE = 0.5;            
+    <script>
+        /* --- 核心邏輯 (完全保留) --- */
+        const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
+        let currentState = STATE.IDLE;
+        let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode;
+        let audioChunks = [], capturedImageBlobs = [], captureInterval;
+        let CURRENT_BASE_URL = null;
+        let ignoreClicksUntil = 0;
 
-    async function manualConnect() {
-        const url = document.getElementById('tunnel-url').value.trim();
-        if(!url) return alert("請輸入網址");
-        try {
-            const testImg = new Image();
-            testImg.src = `${url}/static/image/humorous.png`;
-            testImg.onload = () => {
-                CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
-                document.getElementById('record-button').disabled = false;
-                document.getElementById('record-text').textContent = "點擊開始 (Click to Start)";
-                loadAvatar('humorous'); 
-                initMedia();
+        const VOICE_THRESHOLD = 5;      
+        const SILENCE_TIMEOUT = 2.5;     
+        const FRAME_RATE = 0.5;
+
+        async function manualConnect() {
+            const url = document.getElementById('tunnel-url').value.trim();
+            if(!url) return alert("請輸入網址");
+            try {
+                const testImg = new Image();
+                testImg.src = `${url}/static/image/humorous.png`;
+                testImg.onload = () => {
+                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
+                    document.getElementById('record-button').disabled = false;
+                    document.getElementById('record-text').textContent = "點擊開始對話";
+                    loadAvatar('humorous'); 
+                    initMedia();
+                };
+                testImg.onerror = () => alert("連線失敗");
+            } catch(e) { alert("錯誤: " + e.message); }
+        }
+
+        async function initMedia() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                audioStream = stream;
+                document.getElementById('video-stream').srcObject = stream;
+                videoTrack = stream.getVideoTracks()[0];
+                setupAudioVisualizer(stream);
+            } catch(e) { console.error(e); alert("無法取得權限"); }
+        }
+
+        function setupAudioVisualizer(stream) {
+            if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyserNode = audioContext.createAnalyser();
+            analyserNode.fftSize = 512;
+            source.connect(analyserNode);
+            drawVisualizer();
+        }
+
+        function drawVisualizer() {
+            const canvas = document.getElementById('audio-visualizer');
+            const ctx = canvas.getContext('2d');
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            const bufferLength = analyserNode.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            const draw = () => {
+                requestAnimationFrame(draw);
+                analyserNode.getByteFrequencyData(dataArray);
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let x = 0;
+                for(let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * canvas.height;
+                    ctx.fillStyle = `rgb(74, 144, 226)`; 
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+                let sum = 0; for(let i=0; i<bufferLength; i++) sum += dataArray[i];
+                if(currentState === STATE.RECORDING && (sum/bufferLength) > VOICE_THRESHOLD) lastSpeechTime = Date.now();
             };
-            testImg.onerror = () => alert("連線失敗");
-        } catch(e) { alert("錯誤: " + e.message); }
-    }
-
-    async function initMedia() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-            audioStream = stream;
-            document.getElementById('video-stream').srcObject = stream;
-            videoTrack = stream.getVideoTracks()[0];
-            setupAudioVisualizer(stream);
-        } catch(e) { console.error(e); alert("無法取得權限"); }
-    }
-
-    function setupAudioVisualizer(stream) {
-        if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioContext.createMediaStreamSource(stream);
-        analyserNode = audioContext.createAnalyser();
-        analyserNode.fftSize = 512;
-        source.connect(analyserNode);
-        drawVisualizer();
-    }
-
-    function drawVisualizer() {
-        const canvas = document.getElementById('audio-visualizer');
-        const ctx = canvas.getContext('2d');
-        const bufferLength = analyserNode.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        const draw = () => {
-            requestAnimationFrame(draw);
-            analyserNode.getByteFrequencyData(dataArray);
-            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            const barWidth = (canvas.width / bufferLength) * 2.5;
-            let x = 0;
-            for(let i = 0; i < bufferLength; i++) {
-                const barHeight = dataArray[i] / 2;
-                ctx.fillStyle = `rgb(0, 255, 0)`;
-                ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-                x += barWidth + 1;
-            }
-            // VAD 邏輯
-            let sum = 0; for(let i=0; i<bufferLength; i++) sum += dataArray[i];
-            if(currentState === STATE.RECORDING && (sum/bufferLength) > VOICE_THRESHOLD) lastSpeechTime = Date.now();
-        };
-        draw();
-    }
-
-    let lastSpeechTime = 0;
-    let silenceTimer = null;
-
-    function toggleRecording() {
-        if(Date.now() < ignoreClicksUntil) return;
-        if(currentState === STATE.IDLE) startRecording();
-        else if(currentState === STATE.RECORDING) stopRecording();
-    }
-
-    function updateBtnState(state) {
-        currentState = state;
-        const btn = document.getElementById('record-button');
-        const txt = document.getElementById('record-text');
-        if(state === STATE.IDLE) {
-            btn.className = 'btn-idle'; txt.textContent = "點擊開始"; btn.disabled = false;
-        } else if(state === STATE.RECORDING) {
-            btn.className = 'btn-recording'; txt.textContent = "聆聽中... (VAD)"; btn.disabled = false;
-        } else if(state === STATE.PROCESSING) {
-            btn.className = 'btn-processing'; txt.textContent = "運算中..."; btn.disabled = true;
+            draw();
         }
-    }
 
-    function startRecording() {
-        updateBtnState(STATE.RECORDING);
-        audioChunks = []; capturedImageBlobs = [];
-        mediaRecorder = new MediaRecorder(audioStream);
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = uploadData;
-        mediaRecorder.start();
-        captureInterval = setInterval(() => {
-            if(!videoTrack) return;
-            const cvs = document.createElement('canvas');
-            cvs.width = 640; cvs.height = 480;
-            cvs.getContext('2d').drawImage(document.getElementById('video-stream'), 0, 0);
-            cvs.toBlob(b => capturedImageBlobs.push(b), 'image/jpeg', 0.8);
-        }, 1000/FRAME_RATE);
-        lastSpeechTime = Date.now();
-        ignoreClicksUntil = Date.now() + 1000;
-        silenceTimer = setInterval(() => {
-            if(Date.now() - lastSpeechTime > SILENCE_TIMEOUT * 1000) {
-                if(Date.now() > ignoreClicksUntil) stopRecording(); 
+        let lastSpeechTime = 0;
+        let silenceTimer = null;
+        function toggleRecording() {
+            if(Date.now() < ignoreClicksUntil) return;
+            if(currentState === STATE.IDLE) startRecording();
+            else if(currentState === STATE.RECORDING) stopRecording();
+        }
+
+        function updateBtnState(state) {
+            currentState = state;
+            const btn = document.getElementById('record-button');
+            const txt = document.getElementById('record-text');
+            if(state === STATE.IDLE) {
+                btn.className = 'btn-idle'; txt.textContent = "點擊開始對話"; btn.disabled = false;
+            } else if(state === STATE.RECORDING) {
+                btn.className = 'btn-recording'; txt.textContent = "聆聽中..."; btn.disabled = false;
+            } else if(state === STATE.PROCESSING) {
+                btn.className = 'btn-processing'; txt.textContent = "AI 思考中..."; btn.disabled = true;
             }
-        }, 500);
-    }
+        }
 
-    function stopRecording() {
-        if(currentState !== STATE.RECORDING) return;
-        clearInterval(captureInterval); clearInterval(silenceTimer);
-        mediaRecorder.stop();
-        updateBtnState(STATE.PROCESSING);
-    }
+        function startRecording() {
+            updateBtnState(STATE.RECORDING);
+            audioChunks = []; capturedImageBlobs = [];
+            mediaRecorder = new MediaRecorder(audioStream);
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = uploadData;
+            mediaRecorder.start();
+            captureInterval = setInterval(() => {
+                if(!videoTrack) return;
+                const cvs = document.createElement('canvas');
+                cvs.width = 640; cvs.height = 480;
+                cvs.getContext('2d').drawImage(document.getElementById('video-stream'), 0, 0);
+                cvs.toBlob(b => capturedImageBlobs.push(b), 'image/jpeg', 0.8);
+            }, 1000/FRAME_RATE);
+            lastSpeechTime = Date.now();
+            ignoreClicksUntil = Date.now() + 1000;
+            silenceTimer = setInterval(() => {
+                if(Date.now() - lastSpeechTime > SILENCE_TIMEOUT * 1000) {
+                    if(Date.now() > ignoreClicksUntil) stopRecording(); 
+                }
+            }, 500);
+        }
 
-    async function uploadData() {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        if(audioBlob.size < 1000) { updateBtnState(STATE.IDLE); return; }
-        const fd = new FormData();
-        fd.append('audio_file', audioBlob);
-        capturedImageBlobs.forEach((b, i) => fd.append(`image_${i}`, b, `frame_${i}.jpg`));
-        fd.append('turn_data', JSON.stringify({ session_id: 'demo_01', history: [] }));
-        try {
-            const res = await fetch(`${CURRENT_BASE_URL}/api/v1/process`, { method: 'POST', body: fd });
-            handleResult(await res.json());
-        } catch(e) { alert("上傳失敗"); updateBtnState(STATE.IDLE); }
-    }
+        function stopRecording() {
+            if(currentState !== STATE.RECORDING) return;
+            clearInterval(captureInterval); clearInterval(silenceTimer);
+            mediaRecorder.stop();
+            updateBtnState(STATE.PROCESSING);
+        }
 
-    function handleResult(data) {
-        // 更新對話
-        const chatArea = document.getElementById('current-dialogue-area');
-        chatArea.innerHTML = `
-            <div class="bubble user-bubble">${data.user_text || "..."}</div>
-            <div class="bubble bot-bubble">${data.reply || "..."}</div>
-        `;
+        async function uploadData() {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            if(audioBlob.size < 1000) { updateBtnState(STATE.IDLE); return; }
+            const fd = new FormData();
+            fd.append('audio_file', audioBlob);
+            capturedImageBlobs.forEach((b, i) => fd.append(`image_${i}`, b, `frame_${i}.jpg`));
+            fd.append('turn_data', JSON.stringify({ session_id: 'demo_01', history: [] }));
+            try {
+                const res = await fetch(`${CURRENT_BASE_URL}/api/v1/process`, { method: 'POST', body: fd });
+                handleResult(await res.json());
+            } catch(e) { alert("上傳失敗"); updateBtnState(STATE.IDLE); }
+        }
+
+        function handleResult(data) {
+            const chatArea = document.getElementById('current-dialogue-area');
+            chatArea.innerHTML = `
+                <div class="bubble user-bubble">${data.user_text || "..."}</div>
+                <div class="bubble bot-bubble">${data.reply || "..."}</div>
+            `;
+            
+            const mapE = { "comforting": "🤗 安撫", "cheerful": "😄 開朗", "humorous": "😆 幽默", "gentle": "💝 溫柔", "rational": "🤔 理性", "encouraging": "💪 鼓勵" };
+            const pName = mapE[data.personality] || data.personality;
+            document.getElementById('personality-display').textContent = pName;
+            document.getElementById('personality-mode-tag').textContent = data.new_manual_personality ? "(手動)" : "(自動)";
+
+            if(data.emotion_results) {
+                if(data.emotion_results.text) document.getElementById('text-emotion-display').textContent = `${data.emotion_results.text.emotion} ${(data.emotion_results.text.score*100).toFixed(0)}%`;
+                if(data.emotion_results.audio) document.getElementById('audio-emotion-display').textContent = `${data.emotion_results.audio.emotion} ${(data.emotion_results.audio.score*100).toFixed(0)}%`;
+                if(data.emotion_results.facial) document.getElementById('facial-emotion-display').textContent = `${data.emotion_results.facial.emotion} ${(data.emotion_results.facial.confidence*100).toFixed(0)}%`;
+            }
+
+            if(data.calculation_logs) {
+                document.getElementById('calc-display-area').textContent = data.calculation_logs.join('\n');
+            }
+
+            loadAvatar(data.personality);
+            if(data.tts_audio_file) playAudio(data.tts_audio_file);
+            else updateBtnState(STATE.IDLE);
+        }
+
+        function loadAvatar(personality) {
+            document.getElementById('assistant-avatar').src = `${CURRENT_BASE_URL}/static/image/${personality || 'humorous'}.png`;
+        }
+
+        function playAudio(filename) {
+            const audio = document.getElementById('tts-audio');
+            const avatar = document.getElementById('assistant-avatar');
+            audio.src = `${CURRENT_BASE_URL}/api/v1/audio-download?filename=${filename}`;
+            audio.onplay = () => avatar.classList.add('speaking');
+            audio.onended = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
+            audio.onerror = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
+            audio.play();
+        }
+    </script>
+
+    <script>
+        const dialogueObserver = new MutationObserver((mutations) => {
+            const source = document.getElementById('current-dialogue-area');
+            const userBubble = source.querySelector('.user-bubble');
+            const botBubble = source.querySelector('.bot-bubble');
+            
+            const userMirror = document.getElementById('user-text-mirror');
+            if(userBubble) userMirror.textContent = userBubble.textContent;
+
+            const aiMirror = document.getElementById('ai-bubble-mirror');
+            if(botBubble) {
+                aiMirror.textContent = botBubble.textContent;
+                aiMirror.classList.add('show');
+            } else {
+                aiMirror.classList.remove('show');
+            }
+        });
+        dialogueObserver.observe(document.getElementById('current-dialogue-area'), { childList: true, subtree: true });
+
+        // 修改：能解析 "happy 80%" 並分開顯示
+        function syncProgressBar(sourceId, barId, labelId, valId) {
+            const source = document.getElementById(sourceId);
+            const observer = new MutationObserver(() => {
+                const fullText = source.textContent; // "happy 80%"
+                // 簡易解析：抓出文字與百分比
+                const match = fullText.match(/^([a-zA-Z]+)\s+(\d+)%$/);
+                
+                if (match) {
+                    const emotionName = match[1];
+                    const percent = match[2];
+                    
+                    document.getElementById(barId).style.width = percent + "%";
+                    document.getElementById(labelId).textContent = emotionName;
+                    document.getElementById(valId).textContent = percent + "%";
+                } else if (fullText.trim() === "--") {
+                     document.getElementById(labelId).textContent = "--";
+                     document.getElementById(valId).textContent = "0%";
+                     document.getElementById(barId).style.width = "0%";
+                }
+            });
+            observer.observe(source, { childList: true, characterData: true, subtree: true });
+        }
         
-        // 更新左側數據
-        const mapE = { "comforting": "🤗 安撫", "cheerful": "😄 開朗", "humorous": "😆 幽默", "gentle": "💝 溫柔", "rational": "🤔 理性", "encouraging": "💪 鼓勵" };
-        const pName = mapE[data.personality] || data.personality;
-        document.getElementById('personality-display').textContent = pName;
-        document.getElementById('personality-mode-tag').textContent = data.new_manual_personality ? "手動介入" : "自動演算";
-
-        if(data.emotion_results) {
-            if(data.emotion_results.text) document.getElementById('text-emotion-display').textContent = `${data.emotion_results.text.emotion} ${(data.emotion_results.text.score*100).toFixed(0)}%`;
-            if(data.emotion_results.audio) document.getElementById('audio-emotion-display').textContent = `${data.emotion_results.audio.emotion} ${(data.emotion_results.audio.score*100).toFixed(0)}%`;
-            if(data.emotion_results.facial) document.getElementById('facial-emotion-display').textContent = `${data.emotion_results.facial.emotion} ${(data.emotion_results.facial.confidence*100).toFixed(0)}%`;
-        }
-
-        // 更新計算顯示 (直接秀出)
-        if(data.calculation_logs) {
-            document.getElementById('calc-display-area').textContent = data.calculation_logs.join('\n');
-        }
-
-        loadAvatar(data.personality);
-        if(data.tts_audio_file) playAudio(data.tts_audio_file);
-        else updateBtnState(STATE.IDLE);
-    }
-
-    function loadAvatar(personality) {
-        document.getElementById('assistant-avatar').src = `${CURRENT_BASE_URL}/static/image/${personality || 'humorous'}.png`;
-    }
-
-    function playAudio(filename) {
-        const audio = document.getElementById('tts-audio');
-        const avatar = document.getElementById('assistant-avatar');
-        audio.src = `${CURRENT_BASE_URL}/api/v1/audio-download?filename=${filename}`;
-        audio.onplay = () => avatar.classList.add('speaking');
-        audio.onended = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
-        audio.onerror = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
-        audio.play();
-    }
-</script>
+        // 綁定三個進度條
+        syncProgressBar('text-emotion-display', 'bar-text-visual', 'label-text-visual', 'val-text-visual');
+        syncProgressBar('audio-emotion-display', 'bar-audio-visual', 'label-audio-visual', 'val-audio-visual');
+        syncProgressBar('facial-emotion-display', 'bar-face-visual', 'label-face-visual', 'val-face-visual');
+    </script>
 
 </body>
 </html>
