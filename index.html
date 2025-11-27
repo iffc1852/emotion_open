@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態情緒助理</title>
+    <title>AI 多模態助理 (最終完美版)</title>
     <style>
         /* --- 1. 全局設定 --- */
         body { 
@@ -69,7 +69,7 @@
 
         /* 語音輸入區 (佔上半部) */
         .video-container-wrapper { 
-            height: 45%; /* 固定高度 */
+            height: 45%; 
             display: flex; 
             flex-direction: column; 
         }
@@ -91,7 +91,7 @@
         .btn-processing { background-color: #ffa502; color: white; }
 
 
-        /* ================= 右側區域 (重點修改) ================= */
+        /* ================= 右側區域 ================= */
         .right-column {
             display: flex; 
             flex-direction: column; 
@@ -99,7 +99,7 @@
             height: 100%;
         }
 
-        /* 1. 情緒感知 (最上方) */
+        /* 1. 情緒感知 */
         .emotion-section {
             background: #fff; border-radius: 16px; padding: 20px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.05);
@@ -116,9 +116,9 @@
         .emotion-name { font-size: 0.9em; font-weight: 600; color: #666; text-transform: uppercase; }
         .emotion-percent { font-size: 1.1em; font-weight: 800; color: #333; min-width: 45px; text-align: right; }
 
-        /* 2. 決策計算 (高度縮小，讓下面往上擠) */
+        /* 2. 決策計算 */
         .calc-wrapper { 
-            flex-shrink: 0; /* 不要自動縮放，固定高度 */
+            flex-shrink: 0; 
             display: flex; 
             flex-direction: column; 
         }
@@ -127,7 +127,6 @@
         #personality-display { color: #6f42c1; font-weight: 800; font-size: 1.2em; margin-left: 8px; }
 
         .calc-section {
-            /* ⚠️ 關鍵修改：高度設為 180px (大約 6-7 行字的高度) */
             height: 180px; 
             background-color: #282c34; color: #98c379;
             border-radius: 12px; padding: 20px;
@@ -140,9 +139,8 @@
             border: 1px solid #3e4451;
         }
 
-        /* 3. AI 舞台 (改為填滿剩餘空間) */
+        /* 3. AI 舞台 */
         .avatar-section {
-            /* ⚠️ 關鍵修改：使用 flex: 1 讓它自動填滿下方所有剩餘空間 */
             flex: 1; 
             background: #ffffff;
             border-radius: 20px;
@@ -152,21 +150,24 @@
             align-items: flex-end; /* 底部對齊 */
             padding: 20px;
             position: relative;
-            min-height: 200px; /* 防止過度壓縮 */
+            min-height: 200px;
         }
         
-        /* 對話區：左側 */
+        /* 對話區：調整對齊方式 */
         .stage-dialogue-area {
             flex: 1;
             height: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: center; /* 垂直置中 */
+            /* ⚠️ 修正點：改為靠底對齊 (flex-end)，讓對話框沉下來 */
+            justify-content: flex-end; 
             gap: 15px;
             padding-right: 20px;
+            /* ⚠️ 修正點：增加底部 Padding，讓氣泡位置剛好在機器人頭部/肩膀的高度 */
+            padding-bottom: 40px; 
         }
 
-        /* 使用者氣泡 (灰色，左側冒出) */
+        /* 使用者氣泡 (左側) */
         .user-bubble-mirror {
             align-self: flex-start; /* 靠左 */
             background: #f1f3f5; color: #555;
@@ -177,7 +178,7 @@
             opacity: 0; transform: translateX(-20px); transition: all 0.4s ease;
         }
 
-        /* 機器人氣泡 (白色藍框，右側冒出) */
+        /* 機器人氣泡 (右側) */
         .ai-bubble-mirror {
             align-self: flex-end; /* 靠右 */
             background: rgba(255,255,255,0.95);
@@ -192,7 +193,7 @@
         
         .bubble-show { opacity: 1; transform: translateX(0); }
 
-        /* 機器人圖片區：右下角 */
+        /* 機器人圖片區 */
         .stage-avatar-area {
             width: 220px;
             height: 100%;
@@ -237,7 +238,7 @@
                     </button>
                 </div>
             </div>
-            </div>
+        </div>
 
         <div class="right-column">
             
@@ -362,14 +363,12 @@
 
         function drawVisualizer() {
             const canvas = document.getElementById('audio-visualizer');
-            // 雖然隱藏，但 VAD 邏輯需要它跑
             const ctx = canvas.getContext('2d');
             const bufferLength = analyserNode.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             const draw = () => {
                 requestAnimationFrame(draw);
                 analyserNode.getByteFrequencyData(dataArray);
-                // VAD 邏輯
                 let sum = 0; for(let i=0; i<bufferLength; i++) sum += dataArray[i];
                 if(currentState === STATE.RECORDING && (sum/bufferLength) > VOICE_THRESHOLD) lastSpeechTime = Date.now();
             };
@@ -488,11 +487,6 @@
             const userBubble = source.querySelector('.user-bubble');
             const botBubble = source.querySelector('.bot-bubble');
             
-            // 1. 同步左側文字區 (已隱藏，但保留程式碼以免報錯)
-            // const userMirror = document.getElementById('user-text-mirror');
-            // if(userBubble) userMirror.textContent = userBubble.textContent;
-
-            // 2. 同步右側舞台對話
             const stageUserBubble = document.getElementById('stage-user-bubble');
             const stageAiBubble = document.getElementById('stage-ai-bubble');
 
