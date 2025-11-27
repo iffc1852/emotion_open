@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 (最終排版)</title>
+    <title>AI 多模態情緒助理</title>
     <style>
         /* --- 1. 全局設定 --- */
         body { 
@@ -60,17 +60,16 @@
             border-left: 5px solid #007bff; padding-left: 12px;
         }
 
-        /* ================= 左側區域 (留白版) ================= */
+        /* ================= 左側區域 ================= */
         .left-column {
             display: flex; 
             flex-direction: column; 
             height: 100%;
-            /* 這裡不設 gap，讓下方自然留白 */
         }
 
-        /* 語音輸入區 (只佔上半部) */
+        /* 語音輸入區 (佔上半部) */
         .video-container-wrapper { 
-            height: 45%; /* 固定高度，下方留白 */
+            height: 45%; /* 固定高度 */
             display: flex; 
             flex-direction: column; 
         }
@@ -91,10 +90,8 @@
         .btn-recording { background-color: #ff4757; color: white; animation: pulse 1.5s infinite; }
         .btn-processing { background-color: #ffa502; color: white; }
 
-        /* 左下角留白，沒有任何元素 */
 
-
-        /* ================= 右側區域 (佈局調整) ================= */
+        /* ================= 右側區域 (重點修改) ================= */
         .right-column {
             display: flex; 
             flex-direction: column; 
@@ -106,7 +103,7 @@
         .emotion-section {
             background: #fff; border-radius: 16px; padding: 20px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.05);
-            flex-shrink: 0; /* 不縮放 */
+            flex-shrink: 0;
         }
         .progress-row { display: flex; align-items: center; margin-bottom: 15px; }
         .progress-label { width: 50px; font-weight: bold; color: #666; font-size: 1rem; }
@@ -119,33 +116,34 @@
         .emotion-name { font-size: 0.9em; font-weight: 600; color: #666; text-transform: uppercase; }
         .emotion-percent { font-size: 1.1em; font-weight: 800; color: #333; min-width: 45px; text-align: right; }
 
-        /* 2. 決策計算 (中間，加大空間) */
+        /* 2. 決策計算 (高度縮小，讓下面往上擠) */
         .calc-wrapper { 
-            flex: 1; /* 讓它佔據中間大部分空間 */
+            flex-shrink: 0; /* 不要自動縮放，固定高度 */
             display: flex; 
             flex-direction: column; 
-            min-height: 200px; /* 確保夠高 */
         }
         .decision-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .personality-tag { background: #f8f9fa; padding: 6px 15px; border-radius: 20px; font-size: 0.9em; color: #555; border: 1px solid #eee; }
         #personality-display { color: #6f42c1; font-weight: 800; font-size: 1.2em; margin-left: 8px; }
 
         .calc-section {
-            flex: 1; /* 填滿 wrapper */
+            /* ⚠️ 關鍵修改：高度設為 180px (大約 6-7 行字的高度) */
+            height: 180px; 
             background-color: #282c34; color: #98c379;
             border-radius: 12px; padding: 20px;
-            font-family: 'Consolas', 'Monaco', monospace; /* 等寬字體 */
-            font-size: 1em; /* 字體夠大 */
-            line-height: 1.6; /* 行距拉開 */
-            white-space: pre-wrap; /* 保留格式 */
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.95em; 
+            line-height: 1.6; 
+            white-space: pre-wrap;
             overflow-y: auto;
             box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
             border: 1px solid #3e4451;
         }
 
-        /* 3. AI 舞台 (底部，機器人在右下) */
+        /* 3. AI 舞台 (改為填滿剩餘空間) */
         .avatar-section {
-            height: 250px; /* 固定高度區域 */
+            /* ⚠️ 關鍵修改：使用 flex: 1 讓它自動填滿下方所有剩餘空間 */
+            flex: 1; 
             background: #ffffff;
             border-radius: 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.08); 
@@ -154,9 +152,10 @@
             align-items: flex-end; /* 底部對齊 */
             padding: 20px;
             position: relative;
+            min-height: 200px; /* 防止過度壓縮 */
         }
         
-        /* 對話區：讓 User 靠左，AI 靠右 */
+        /* 對話區：左側 */
         .stage-dialogue-area {
             flex: 1;
             height: 100%;
@@ -167,7 +166,7 @@
             padding-right: 20px;
         }
 
-        /* 使用者氣泡 (左邊冒出) */
+        /* 使用者氣泡 (灰色，左側冒出) */
         .user-bubble-mirror {
             align-self: flex-start; /* 靠左 */
             background: #f1f3f5; color: #555;
@@ -178,9 +177,9 @@
             opacity: 0; transform: translateX(-20px); transition: all 0.4s ease;
         }
 
-        /* 機器人氣泡 (右邊冒出) */
+        /* 機器人氣泡 (白色藍框，右側冒出) */
         .ai-bubble-mirror {
-            align-self: flex-end; /* 靠右 (靠近機器人) */
+            align-self: flex-end; /* 靠右 */
             background: rgba(255,255,255,0.95);
             border: 2px solid #007bff;
             color: #333; font-weight: bold; font-size: 1.3rem;
@@ -193,9 +192,9 @@
         
         .bubble-show { opacity: 1; transform: translateX(0); }
 
-        /* 機器人圖片區 */
+        /* 機器人圖片區：右下角 */
         .stage-avatar-area {
-            width: 200px;
+            width: 220px;
             height: 100%;
             display: flex;
             align-items: flex-end;
@@ -308,11 +307,12 @@
     <div class="logic-holder">
         <div id="current-dialogue-area"></div>
         <canvas id="audio-visualizer" width="10" height="10"></canvas> 
-        <div id="user-text-mirror"></div> <audio id="tts-audio"></audio>
+        <div id="user-text-mirror"></div>
+        <audio id="tts-audio"></audio>
     </div>
 
     <script>
-        /* --- 核心運作邏輯 (完全不變) --- */
+        /* --- 核心運作邏輯 (不變) --- */
         const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
         let currentState = STATE.IDLE;
         let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode;
@@ -488,6 +488,11 @@
             const userBubble = source.querySelector('.user-bubble');
             const botBubble = source.querySelector('.bot-bubble');
             
+            // 1. 同步左側文字區 (已隱藏，但保留程式碼以免報錯)
+            // const userMirror = document.getElementById('user-text-mirror');
+            // if(userBubble) userMirror.textContent = userBubble.textContent;
+
+            // 2. 同步右側舞台對話
             const stageUserBubble = document.getElementById('stage-user-bubble');
             const stageAiBubble = document.getElementById('stage-ai-bubble');
 
