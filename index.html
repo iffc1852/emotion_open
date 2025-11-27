@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 多模態助理 (最終佈局版)</title>
+    <title>AI 多模態助理 (最終排版)</title>
     <style>
         /* --- 1. 全局設定 --- */
         body { 
@@ -26,7 +26,7 @@
             border-radius: 20px;
             box-shadow: 0 15px 40px rgba(0,0,0,0.12); 
             display: grid;
-            grid-template-columns: 380px 1fr; /* 左側略縮，右側加大 */
+            grid-template-columns: 350px 1fr; /* 左側固定，右側自適應 */
             gap: 30px;
             padding: 40px;
             box-sizing: border-box;
@@ -60,13 +60,21 @@
             border-left: 5px solid #007bff; padding-left: 12px;
         }
 
-        /* ================= 左側區域 ================= */
+        /* ================= 左側區域 (留白版) ================= */
         .left-column {
-            display: flex; flex-direction: column; gap: 20px; height: 100%;
+            display: flex; 
+            flex-direction: column; 
+            height: 100%;
+            /* 這裡不設 gap，讓下方自然留白 */
         }
 
-        /* 視訊區 */
-        .video-container-wrapper { flex: 1.5; display: flex; flex-direction: column; }
+        /* 語音輸入區 (只佔上半部) */
+        .video-container-wrapper { 
+            height: 45%; /* 固定高度，下方留白 */
+            display: flex; 
+            flex-direction: column; 
+        }
+
         .video-box {
             flex: 1; background: #ffffff; border-radius: 16px; padding: 10px;
             box-shadow: 0 5px 20px rgba(0,0,0,0.06); display: flex; flex-direction: column;
@@ -83,27 +91,22 @@
         .btn-recording { background-color: #ff4757; color: white; animation: pulse 1.5s infinite; }
         .btn-processing { background-color: #ffa502; color: white; }
 
-        /* 文字區 (縮小) */
-        .text-container-wrapper { flex: 1; display: flex; flex-direction: column; }
-        .text-input-box {
-            background: #fcfcfc; border-radius: 16px; padding: 20px; flex: 1; display: flex; flex-direction: column;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.02); border: 1px solid #f0f0f0;
-        }
-        #user-text-mirror {
-            flex: 1; background: transparent; font-size: 1em; color: #666; overflow-y: auto; margin-bottom: 10px; font-style: italic;
-        }
-        .visualizer-container { height: 40px; border-radius: 10px; background: #fff; border: 1px solid #eee; overflow: hidden; }
-        #audio-visualizer { width: 100%; height: 100%; }
+        /* 左下角留白，沒有任何元素 */
 
-        /* ================= 右側區域 (重點修改) ================= */
+
+        /* ================= 右側區域 (佈局調整) ================= */
         .right-column {
-            display: flex; flex-direction: column; gap: 20px; height: 100%;
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px; 
+            height: 100%;
         }
 
-        /* 1. 情緒感知 */
+        /* 1. 情緒感知 (最上方) */
         .emotion-section {
             background: #fff; border-radius: 16px; padding: 20px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+            flex-shrink: 0; /* 不縮放 */
         }
         .progress-row { display: flex; align-items: center; margin-bottom: 15px; }
         .progress-label { width: 50px; font-weight: bold; color: #666; font-size: 1rem; }
@@ -116,57 +119,83 @@
         .emotion-name { font-size: 0.9em; font-weight: 600; color: #666; text-transform: uppercase; }
         .emotion-percent { font-size: 1.1em; font-weight: 800; color: #333; min-width: 45px; text-align: right; }
 
-        /* 2. 決策計算 (加大、排版) */
-        .calc-wrapper { flex-shrink: 0; }
+        /* 2. 決策計算 (中間，加大空間) */
+        .calc-wrapper { 
+            flex: 1; /* 讓它佔據中間大部分空間 */
+            display: flex; 
+            flex-direction: column; 
+            min-height: 200px; /* 確保夠高 */
+        }
         .decision-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .personality-tag { background: #f8f9fa; padding: 6px 15px; border-radius: 20px; font-size: 0.9em; color: #555; border: 1px solid #eee; }
         #personality-display { color: #6f42c1; font-weight: 800; font-size: 1.2em; margin-left: 8px; }
 
         .calc-section {
+            flex: 1; /* 填滿 wrapper */
             background-color: #282c34; color: #98c379;
-            border-radius: 12px; padding: 20px; /* 增加內距 */
-            font-family: 'Consolas', monospace; 
-            font-size: 0.95em; /* 字體加大 */
-            line-height: 1.6;  /* 行距拉開 */
-            height: 160px;     /* 高度加大 */
+            border-radius: 12px; padding: 20px;
+            font-family: 'Consolas', 'Monaco', monospace; /* 等寬字體 */
+            font-size: 1em; /* 字體夠大 */
+            line-height: 1.6; /* 行距拉開 */
+            white-space: pre-wrap; /* 保留格式 */
             overflow-y: auto;
             box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
             border: 1px solid #3e4451;
         }
-        /* 讓計算過程的關鍵字更明顯 */
-        .calc-highlight { color: #e06c75; font-weight: bold; }
 
-        /* 3. AI 舞台 (佈局重構) */
+        /* 3. AI 舞台 (底部，機器人在右下) */
         .avatar-section {
-            flex: 1; /* 佔據剩餘空間 */
+            height: 250px; /* 固定高度區域 */
             background: #ffffff;
             border-radius: 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.08); 
-            display: flex; /* 改用 Flex */
-            flex-direction: row; /* 左右排列 */
+            display: flex;
+            flex-direction: row;
             align-items: flex-end; /* 底部對齊 */
-            justify-content: space-between;
             padding: 20px;
-            overflow: hidden;
             position: relative;
         }
         
-        /* 左邊：對話區 (機器人左邊) */
+        /* 對話區：讓 User 靠左，AI 靠右 */
         .stage-dialogue-area {
             flex: 1;
             height: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: flex-end; /* 對話在底部 */
-            align-items: flex-end; /* 靠右對齊 (靠近機器人) */
-            padding-right: 20px;
-            padding-bottom: 20px;
+            justify-content: center; /* 垂直置中 */
             gap: 15px;
+            padding-right: 20px;
         }
 
-        /* 右邊：機器人 (固定在右下) */
+        /* 使用者氣泡 (左邊冒出) */
+        .user-bubble-mirror {
+            align-self: flex-start; /* 靠左 */
+            background: #f1f3f5; color: #555;
+            font-size: 1rem;
+            border-radius: 15px 15px 15px 0; /* 左下角尖 */
+            max-width: 80%;
+            padding: 12px 20px;
+            opacity: 0; transform: translateX(-20px); transition: all 0.4s ease;
+        }
+
+        /* 機器人氣泡 (右邊冒出) */
+        .ai-bubble-mirror {
+            align-self: flex-end; /* 靠右 (靠近機器人) */
+            background: rgba(255,255,255,0.95);
+            border: 2px solid #007bff;
+            color: #333; font-weight: bold; font-size: 1.3rem;
+            border-radius: 15px 15px 0 15px; /* 右下角尖 */
+            box-shadow: 0 5px 20px rgba(0,123,255,0.15);
+            max-width: 90%;
+            padding: 15px 25px;
+            opacity: 0; transform: translateX(20px); transition: all 0.4s ease;
+        }
+        
+        .bubble-show { opacity: 1; transform: translateX(0); }
+
+        /* 機器人圖片區 */
         .stage-avatar-area {
-            width: 35%; /* 機器人佔寬度 */
+            width: 200px;
             height: 100%;
             display: flex;
             align-items: flex-end;
@@ -175,33 +204,10 @@
 
         #assistant-avatar {
             max-width: 100%; max-height: 100%; object-fit: contain;
-            transition: transform 0.2s; filter: drop-shadow(0 15px 30px rgba(0,0,0,0.15));
+            transition: transform 0.2s; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.15));
         }
         .speaking { animation: bounce 0.6s infinite alternate; }
         @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.05); } }
-
-        /* 氣泡樣式 */
-        .bubble-base {
-            padding: 15px 25px; border-radius: 20px; max-width: 90%; 
-            opacity: 0; transform: translateY(20px); transition: all 0.4s ease;
-        }
-        .bubble-base.show { opacity: 1; transform: translateY(0); }
-
-        /* User 氣泡 (上方，縮小，半透明) */
-        .user-bubble-mirror {
-            background: #f1f3f5; color: #666;
-            font-size: 1rem; border-bottom-right-radius: 5px;
-            margin-right: 10px; /* 稍微錯開 */
-        }
-
-        /* Robot 氣泡 (下方，大，清晰) */
-        .ai-bubble-mirror {
-            background: rgba(255,255,255,0.95);
-            border: 2px solid #007bff;
-            color: #333; font-weight: bold; font-size: 1.4rem;
-            border-bottom-right-radius: 0; /* 指向右邊機器人 */
-            box-shadow: 0 10px 25px rgba(0,123,255,0.15);
-        }
 
         /* 隱藏區 */
         .logic-holder { position: absolute; opacity: 0; pointer-events: none; height: 0; width: 0; }
@@ -232,52 +238,40 @@
                     </button>
                 </div>
             </div>
-
-            <div class="text-container-wrapper">
-                <h3>文字輸入</h3>
-                <div class="text-input-box">
-                    <div id="user-text-mirror">(等待對話...)</div>
-                    <div class="visualizer-container">
-                        <canvas id="audio-visualizer"></canvas>
-                    </div>
-                </div>
             </div>
-        </div>
 
         <div class="right-column">
             
-            <div>
+            <div class="emotion-section">
                 <h3>多模態情緒感知</h3>
-                <div class="emotion-section">
-                    <div class="progress-row">
-                        <div class="progress-label">文字</div>
-                        <div class="progress-track"><div class="progress-bar bar-text" id="bar-text-visual"></div></div>
-                        <div class="progress-info">
-                            <span id="label-text-visual" class="emotion-name">--</span>
-                            <span id="val-text-visual" class="emotion-percent">0%</span>
-                        </div>
+                <div class="progress-row">
+                    <div class="progress-label">文字</div>
+                    <div class="progress-track"><div class="progress-bar bar-text" id="bar-text-visual"></div></div>
+                    <div class="progress-info">
+                        <span id="label-text-visual" class="emotion-name">--</span>
+                        <span id="val-text-visual" class="emotion-percent">0%</span>
                     </div>
-                    <div class="progress-row">
-                        <div class="progress-label">語音</div>
-                        <div class="progress-track"><div class="progress-bar bar-audio" id="bar-audio-visual"></div></div>
-                        <div class="progress-info">
-                            <span id="label-audio-visual" class="emotion-name">--</span>
-                            <span id="val-audio-visual" class="emotion-percent">0%</span>
-                        </div>
+                </div>
+                <div class="progress-row">
+                    <div class="progress-label">語音</div>
+                    <div class="progress-track"><div class="progress-bar bar-audio" id="bar-audio-visual"></div></div>
+                    <div class="progress-info">
+                        <span id="label-audio-visual" class="emotion-name">--</span>
+                        <span id="val-audio-visual" class="emotion-percent">0%</span>
                     </div>
-                    <div class="progress-row">
-                        <div class="progress-label">臉部</div>
-                        <div class="progress-track"><div class="progress-bar bar-face" id="bar-face-visual"></div></div>
-                        <div class="progress-info">
-                            <span id="label-face-visual" class="emotion-name">--</span>
-                            <span id="val-face-visual" class="emotion-percent">0%</span>
-                        </div>
+                </div>
+                <div class="progress-row">
+                    <div class="progress-label">臉部</div>
+                    <div class="progress-track"><div class="progress-bar bar-face" id="bar-face-visual"></div></div>
+                    <div class="progress-info">
+                        <span id="label-face-visual" class="emotion-name">--</span>
+                        <span id="val-face-visual" class="emotion-percent">0%</span>
                     </div>
-                    <div class="hidden-data">
-                        <span id="text-emotion-display">--</span>
-                        <span id="audio-emotion-display">--</span>
-                        <span id="facial-emotion-display">--</span>
-                    </div>
+                </div>
+                <div class="hidden-data">
+                    <span id="text-emotion-display">--</span>
+                    <span id="audio-emotion-display">--</span>
+                    <span id="facial-emotion-display">--</span>
                 </div>
             </div>
 
@@ -290,17 +284,16 @@
                     </div>
                 </div>
                 <div id="calc-display-area" class="calc-section">
-                    > System initialized...<br>
-                    > Waiting for input...
+                    System Initialized...<br>Waiting for input...
                 </div>
             </div>
 
             <div class="avatar-section">
                 <div class="stage-dialogue-area">
-                    <div id="stage-user-bubble" class="bubble-base user-bubble-mirror">
+                    <div id="stage-user-bubble" class="user-bubble-mirror">
                         ...
                     </div>
-                    <div id="stage-ai-bubble" class="bubble-base ai-bubble-mirror">
+                    <div id="stage-ai-bubble" class="ai-bubble-mirror">
                         (我是 AI 助理)
                     </div>
                 </div>
@@ -314,11 +307,12 @@
 
     <div class="logic-holder">
         <div id="current-dialogue-area"></div>
-        <audio id="tts-audio"></audio>
+        <canvas id="audio-visualizer" width="10" height="10"></canvas> 
+        <div id="user-text-mirror"></div> <audio id="tts-audio"></audio>
     </div>
 
     <script>
-        /* --- 核心運作邏輯 (不變) --- */
+        /* --- 核心運作邏輯 (完全不變) --- */
         const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
         let currentState = STATE.IDLE;
         let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode;
@@ -368,25 +362,14 @@
 
         function drawVisualizer() {
             const canvas = document.getElementById('audio-visualizer');
+            // 雖然隱藏，但 VAD 邏輯需要它跑
             const ctx = canvas.getContext('2d');
-            const container = canvas.parentElement;
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
             const bufferLength = analyserNode.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             const draw = () => {
                 requestAnimationFrame(draw);
                 analyserNode.getByteFrequencyData(dataArray);
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                const barWidth = (canvas.width / bufferLength) * 2.5;
-                let x = 0;
-                for(let i = 0; i < bufferLength; i++) {
-                    const barHeight = (dataArray[i] / 255) * canvas.height;
-                    ctx.fillStyle = `rgb(74, 144, 226)`; 
-                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-                    x += barWidth + 1;
-                }
+                // VAD 邏輯
                 let sum = 0; for(let i=0; i<bufferLength; i++) sum += dataArray[i];
                 if(currentState === STATE.RECORDING && (sum/bufferLength) > VOICE_THRESHOLD) lastSpeechTime = Date.now();
             };
@@ -505,21 +488,16 @@
             const userBubble = source.querySelector('.user-bubble');
             const botBubble = source.querySelector('.bot-bubble');
             
-            // 1. 同步左側文字區
-            const userMirror = document.getElementById('user-text-mirror');
-            if(userBubble) userMirror.textContent = userBubble.textContent;
-
-            // 2. 同步右側舞台對話
             const stageUserBubble = document.getElementById('stage-user-bubble');
             const stageAiBubble = document.getElementById('stage-ai-bubble');
 
             if(userBubble) {
                 stageUserBubble.textContent = userBubble.textContent;
-                stageUserBubble.classList.add('show');
+                stageUserBubble.classList.add('bubble-show');
             }
             if(botBubble) {
                 stageAiBubble.textContent = botBubble.textContent;
-                stageAiBubble.classList.add('show');
+                stageAiBubble.classList.add('bubble-show');
             }
         });
         dialogueObserver.observe(document.getElementById('current-dialogue-area'), { childList: true, subtree: true });
