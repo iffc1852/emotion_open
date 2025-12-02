@@ -344,7 +344,7 @@
 
     async function initMedia() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             audioStream = stream;
             document.getElementById('video-stream').srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
