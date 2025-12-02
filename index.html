@@ -37,474 +37,884 @@
         /* --- 頂部連線列 --- */
         .connection-bar {
             position: absolute;
-            top: 0; left: 0; right: 0;
-            background: rgba(40, 44, 52, 0.95);
-            padding: 10px;
-            text-align: center;
-            z-index: 1000;
+            top: 15px;
+            right: 40px;
+            font-size: 14px;
+            color: #777;
             display: flex;
-            justify-content: center;
             align-items: center;
-            gap: 15px;
-            transform: translateY(-85%);
-            transition: transform 0.3s;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .connection-bar:hover { transform: translateY(0); }
-        .connection-bar span { color: #fff; font-weight: bold; font-size: 0.9rem; }
-        .connection-bar input { padding: 8px 15px; border-radius: 20px; border:none; width: 350px; outline: none; }
-        .connection-bar button { cursor: pointer; background: #007bff; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-weight: bold; }
-
-        h3 {
-            margin: 0 0 15px 0; font-size: 1.1em; color: #555; font-weight: 700;
-            border-left: 5px solid #007bff; padding-left: 12px;
+        .connection-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            background-color: #aaa;
+            transition: background-color 0.3s;
+        }
+        .connection-status.connected {
+            background-color: #4CAF50; /* 綠色 */
         }
 
-        /* ================= 左側區域 ================= */
-        .left-column {
-            display: flex; 
-            flex-direction: column; 
-            height: 100%;
-        }
-
-        /* 語音輸入區 (佔上半部) */
-        .video-container-wrapper { 
-            height: 45%; 
-            display: flex; 
-            flex-direction: column; 
-        }
-
-        .video-box {
-            flex: 1; background: #ffffff; border-radius: 16px; padding: 10px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.06); display: flex; flex-direction: column;
-        }
-        #camera-preview {
-            width: 100%; height: 100%; background-color: #222; border-radius: 12px; overflow: hidden;
-        }
-        #camera-preview video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        #record-button {
-            width: 100%; margin-top: 15px; padding: 15px; border-radius: 12px; border: none; font-weight: bold; font-size: 1.1em;
-            cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-        }
-        .btn-idle { background-color: #fff; color: #007bff; border: 2px solid #eef2f7 !important; }
-        .btn-recording { background-color: #ff4757; color: white; animation: pulse 1.5s infinite; }
-        .btn-processing { background-color: #ffa502; color: white; }
-
-
-        /* ================= 右側區域 ================= */
-        .right-column {
-            display: flex; 
-            flex-direction: column; 
-            gap: 20px; 
-            height: 100%;
-        }
-
-        /* 1. 情緒感知 */
-        .emotion-section {
-            background: #fff; border-radius: 16px; padding: 20px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.05);
-            flex-shrink: 0;
-        }
-        .progress-row { display: flex; align-items: center; margin-bottom: 15px; }
-        .progress-label { width: 50px; font-weight: bold; color: #666; font-size: 1rem; }
-        .progress-track { flex: 1; height: 12px; background-color: #f0f2f5; border-radius: 10px; overflow: hidden; margin: 0 15px; }
-        .progress-bar { height: 100%; width: 0%; border-radius: 10px; transition: width 0.5s; }
-        .bar-text { background: linear-gradient(90deg, #f6d365, #fda085); } 
-        .bar-audio { background: linear-gradient(90deg, #84fab0, #8fd3f4); }
-        .bar-face { background: linear-gradient(90deg, #ff9a9e, #fecfef); }
-        .progress-info { width: 140px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
-        .emotion-name { font-size: 0.9em; font-weight: 600; color: #666; text-transform: uppercase; }
-        .emotion-percent { font-size: 1.1em; font-weight: 800; color: #333; min-width: 45px; text-align: right; }
-
-        /* 2. 決策計算 */
-        .calc-wrapper { 
-            flex-shrink: 0; 
-            display: flex; 
-            flex-direction: column; 
-        }
-        .decision-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .personality-tag { background: #f8f9fa; padding: 6px 15px; border-radius: 20px; font-size: 0.9em; color: #555; border: 1px solid #eee; }
-        #personality-display { color: #6f42c1; font-weight: 800; font-size: 1.2em; margin-left: 8px; }
-
-        .calc-section {
-            height: 180px; 
-            background-color: #282c34; color: #98c379;
-            border-radius: 12px; padding: 20px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.95em; 
-            line-height: 1.6; 
-            white-space: pre-wrap;
-            overflow-y: auto;
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
-            border: 1px solid #3e4451;
-        }
-
-        /* 3. AI 舞台 */
-        .avatar-section {
-            flex: 1; 
-            background: #ffffff;
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.08); 
-            display: flex;
-            flex-direction: row;
-            align-items: flex-end; /* 底部對齊 */
-            padding: 20px;
-            position: relative;
-            min-height: 200px;
-        }
-        
-        /* 對話區：調整對齊方式 */
-        .stage-dialogue-area {
-            flex: 1;
-            height: 100%;
+        /* --- 左側控制面板 --- */
+        .left-panel {
             display: flex;
             flex-direction: column;
-            /* ⚠️ 修正點：改為靠底對齊 (flex-end)，讓對話框沉下來 */
-            justify-content: flex-end; 
-            gap: 15px;
-            padding-right: 20px;
-            /* ⚠️ 修正點：增加底部 Padding，讓氣泡位置剛好在機器人頭部/肩膀的高度 */
-            padding-bottom: 40px; 
+            align-items: center;
+            padding: 20px 0;
+            border-right: 1px solid #eee;
         }
-
-        /* 使用者氣泡 (左側) */
-        .user-bubble-mirror {
-            align-self: flex-start; /* 靠左 */
-            background: #f1f3f5; color: #555;
-            font-size: 1rem;
-            border-radius: 15px 15px 15px 0; /* 左下角尖 */
-            max-width: 80%;
-            padding: 12px 20px;
-            opacity: 0; transform: translateX(-20px); transition: all 0.4s ease;
+        .avatar-box {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            background-color: #eee;
         }
-
-        /* 機器人氣泡 (右側) */
-        .ai-bubble-mirror {
-            align-self: flex-end; /* 靠右 */
-            background: rgba(255,255,255,0.95);
-            border: 2px solid #007bff;
-            color: #333; font-weight: bold; font-size: 1.3rem;
-            border-radius: 15px 15px 0 15px; /* 右下角尖 */
-            box-shadow: 0 5px 20px rgba(0,123,255,0.15);
-            max-width: 90%;
-            padding: 15px 25px;
-            opacity: 0; transform: translateX(20px); transition: all 0.4s ease;
-        }
-        
-        .bubble-show { opacity: 1; transform: translateX(0); }
-
-        /* 機器人圖片區 */
-        .stage-avatar-area {
-            width: 220px;
+        .assistant-avatar {
+            width: 100%;
             height: 100%;
+            object-fit: cover;
+            transition: transform 0.2s, filter 0.2s;
+            filter: grayscale(100%); /* 待命時灰階 */
+        }
+        .assistant-avatar.speaking {
+            filter: grayscale(0%); /* 說話時彩色 */
+            transform: scale(1.05); /* 說話時微放大 */
+            box-shadow: 0 0 20px rgba(0, 150, 255, 0.5); /* 說話時有光暈 */
+        }
+        .emotion-badge {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 15px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .mic-preview-box {
+            width: 100%;
+            height: 60px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .mic-level {
+            height: 100%;
+            background-color: #5cb85c;
+            width: 0;
+            transition: width 0.1s;
+        }
+        .mic-status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #333;
+            font-weight: 500;
+        }
+
+        .record-button {
+            width: 280px;
+            height: 60px;
+            border: none;
+            border-radius: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .btn-idle {
+            background-color: #007bff;
+        }
+        .btn-idle:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        .btn-recording {
+            background-color: #dc3545;
+            animation: pulse 1s infinite alternate;
+        }
+        .btn-recording:hover:not(:disabled) {
+            background-color: #c82333;
+        }
+        .btn-processing {
+            background-color: #ffc107;
+            color: #333;
+            cursor: not-allowed;
+        }
+        .record-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            to { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+        }
+
+        /* --- 右側信息面板 --- */
+        .right-panel {
+            display: grid;
+            grid-template-rows: 250px 1fr;
+            gap: 20px;
+        }
+
+        /* --- 訊息歷史 --- */
+        .chat-history {
+            background-color: #f9f9f9;
+            border-radius: 15px;
+            padding: 20px;
+            overflow-y: auto;
             display: flex;
-            align-items: flex-end;
-            justify-content: center;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+        }
+        .message {
+            max-width: 80%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        .user-message {
+            align-self: flex-end;
+            background-color: #007bff;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        .assistant-message {
+            align-self: flex-start;
+            background-color: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 5px;
+        }
+        .assistant-message small {
+            display: block;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .assistant-message .logs {
+            font-size: 10px;
+            margin-top: 8px;
+            padding-top: 5px;
+            border-top: 1px dashed #ced4da;
+            white-space: pre-wrap;
+            opacity: 0.8;
+        }
+        .loading-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #555;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: dot-pulse 1s infinite;
+        }
+        .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes dot-pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
         }
 
-        #assistant-avatar {
-            max-width: 100%; max-height: 100%; object-fit: contain;
-            transition: transform 0.2s; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.15));
-        }
-        .speaking { animation: bounce 0.6s infinite alternate; }
-        @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.05); } }
 
-        /* 隱藏區 */
-        .logic-holder { position: absolute; opacity: 0; pointer-events: none; height: 0; width: 0; }
-        #current-dialogue-area { opacity: 0; height: 0; position: absolute; }
-        .hidden-data { display: none; }
+        /* --- 情緒細節展示 --- */
+        .emotion-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            padding: 10px;
+        }
+        .emotion-card {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e0e0e0;
+        }
+        .emotion-card h4 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 5px;
+        }
+        .emotion-output {
+            font-size: 14px;
+            color: #555;
+            min-height: 20px; /* 確保高度穩定 */
+        }
+        .progress-bar-container {
+            width: 100%;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            margin-top: 8px;
+            height: 10px;
+            position: relative;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 5px;
+            background-color: #007bff;
+            transition: width 0.3s ease-out;
+        }
+        .progress-label-value {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+        }
+        .progress-label-value .label { color: #888; }
+        .progress-label-value .value { color: #007bff; }
+
+
+        /* --- 攝影機預覽區 (可選) --- */
+        .camera-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 120px;
+            height: 90px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            border: 2px solid #fff;
+            background-color: #000;
+        }
+        #webcam-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* 鏡像 */
+        }
+        .camera-status {
+             position: absolute;
+             top: 0;
+             left: 0;
+             background-color: rgba(0,0,0,0.5);
+             color: white;
+             padding: 2px 5px;
+             font-size: 10px;
+             border-radius: 0 0 8px 0;
+        }
+
+
+        /* --- 輸入欄 --- */
+        .input-group {
+            padding: 20px 0;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #eee;
+        }
+        #text-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+        #text-submit-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #text-submit-btn:hover:not(:disabled) {
+            background-color: #1e7e34;
+        }
+        #text-submit-btn:disabled {
+             opacity: 0.6;
+             cursor: not-allowed;
+        }
 
     </style>
 </head>
 <body>
 
-    <div class="connection-bar">
-        <span>⚙️ 連線設定: </span>
-        <input type="text" id="tunnel-url" placeholder="請貼上 Cloudflare Tunnel 網址...">
-        <button onclick="manualConnect()">確認連線</button>
-    </div>
-
     <div class="main-container">
+
+        <div class="connection-bar">
+            <div id="connection-status" class="connection-status"></div>
+            <span id="server-url-display"></span>
+        </div>
+
+        <div class="left-panel">
+            <div class="avatar-box">
+                <img id="assistant-avatar" class="assistant-avatar" src="static/image/humorous.png" alt="Assistant Avatar">
+                <div id="emotion-badge" class="emotion-badge">待命中 (Humorous)</div>
+            </div>
+
+            <div class="mic-preview-box">
+                <div id="mic-level" class="mic-level"></div>
+                <div id="mic-status" class="mic-status">點擊開始</div>
+            </div>
+
+            <button id="record-button" class="record-button btn-idle" disabled>
+                等待連線中...
+            </button>
+            <button id="reset-button" class="record-button btn-idle" style="background-color: #6c757d; width: 100px; height: 40px; font-size: 14px;">
+                重置人格
+            </button>
+
+            <audio id="tts-audio" style="display: none;"></audio>
+        </div>
+
+        <div class="right-panel">
+            <div class="emotion-details">
+                <div class="emotion-card">
+                    <h4>📝 文字情緒 (Text)</h4>
+                    <p id="text-emotion-output" class="emotion-output">--</p>
+                    <div class="progress-bar-container">
+                        <div id="bar-text-visual" class="progress-bar"></div>
+                    </div>
+                    <div class="progress-label-value">
+                        <span id="label-text-visual" class="label">--</span>
+                        <span id="val-text-visual" class="value">0%</span>
+                    </div>
+                </div>
+
+                <div class="emotion-card">
+                    <h4>🔊 語音情緒 (Audio)</h4>
+                    <p id="audio-emotion-output" class="emotion-output">--</p>
+                    <div class="progress-bar-container">
+                        <div id="bar-audio-visual" class="progress-bar"></div>
+                    </div>
+                    <div class="progress-label-value">
+                        <span id="label-audio-visual" class="label">--</span>
+                        <span id="val-audio-visual" class="value">0%</span>
+                    </div>
+                </div>
+
+                <div class="emotion-card">
+                    <h4>👁️ 臉部情緒 (Facial)</h4>
+                    <p id="facial-emotion-output" class="emotion-output">--</p>
+                    <div class="progress-bar-container">
+                        <div id="bar-face-visual" class="progress-bar"></div>
+                    </div>
+                    <div class="progress-label-value">
+                        <span id="label-face-visual" class="label">--</span>
+                        <span id="val-face-visual" class="value">0%</span>
+                    </div>
+                </div>
+
+                <div id="text-emotion-display" style="display: none;"></div>
+                <div id="audio-emotion-display" style="display: none;"></div>
+                <div id="facial-emotion-display" style="display: none;"></div>
+            </div>
+
+            <div id="chat-history" class="chat-history">
+                <div class="assistant-message">
+                    <p>嗨！我是你的 AI 助理。請設定你的連線網址，然後點擊麥克風鈕開始對話吧！</p>
+                    <small id="current-personality">目前人格：自動 (Auto)</small>
+                </div>
+                <div id="loading-indicator" class="assistant-message" style="display: none;">
+                    <p>
+                        助理正在思考中
+                        <span class="loading-dot"></span>
+                        <span class="loading-dot"></span>
+                        <span class="loading-dot"></span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <input type="text" id="text-input" placeholder="或在這裡輸入文字..." disabled>
+                <button id="text-submit-btn" disabled>送出</button>
+            </div>
+        </div>
+
+        <div id="camera-container" class="camera-container" style="display: none;">
+            <video id="webcam-video" autoplay playsinline></video>
+            <div class="camera-status">Webcam 預覽</div>
+        </div>
         
-        <div class="left-column">
-            <div class="video-container-wrapper">
-                <h3>語音輸入</h3>
-                <div class="video-box">
-                    <div id="camera-preview">
-                        <video id="video-stream" autoplay muted></video>
-                    </div>
-                    <button id="record-button" class="btn-idle" onclick="toggleRecording()" disabled>
-                        <span id="record-text">等待連線...</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="right-column">
-            
-            <div class="emotion-section">
-                <h3>多模態情緒感知</h3>
-                <div class="progress-row">
-                    <div class="progress-label">文字</div>
-                    <div class="progress-track"><div class="progress-bar bar-text" id="bar-text-visual"></div></div>
-                    <div class="progress-info">
-                        <span id="label-text-visual" class="emotion-name">--</span>
-                        <span id="val-text-visual" class="emotion-percent">0%</span>
-                    </div>
-                </div>
-                <div class="progress-row">
-                    <div class="progress-label">語音</div>
-                    <div class="progress-track"><div class="progress-bar bar-audio" id="bar-audio-visual"></div></div>
-                    <div class="progress-info">
-                        <span id="label-audio-visual" class="emotion-name">--</span>
-                        <span id="val-audio-visual" class="emotion-percent">0%</span>
-                    </div>
-                </div>
-                <div class="progress-row">
-                    <div class="progress-label">臉部</div>
-                    <div class="progress-track"><div class="progress-bar bar-face" id="bar-face-visual"></div></div>
-                    <div class="progress-info">
-                        <span id="label-face-visual" class="emotion-name">--</span>
-                        <span id="val-face-visual" class="emotion-percent">0%</span>
-                    </div>
-                </div>
-                <div class="hidden-data">
-                    <span id="text-emotion-display">--</span>
-                    <span id="audio-emotion-display">--</span>
-                    <span id="facial-emotion-display">--</span>
-                </div>
-            </div>
-
-            <div class="calc-wrapper">
-                <div class="decision-header">
-                    <h3>決策計算過程</h3>
-                    <div class="personality-tag">
-                        當前: <span id="personality-display">--</span> 
-                        <span id="personality-mode-tag">(Auto)</span>
-                    </div>
-                </div>
-                <div id="calc-display-area" class="calc-section">
-                    System Initialized...<br>Waiting for input...
-                </div>
-            </div>
-
-            <div class="avatar-section">
-                <div class="stage-dialogue-area">
-                    <div id="stage-user-bubble" class="user-bubble-mirror">
-                        ...
-                    </div>
-                    <div id="stage-ai-bubble" class="ai-bubble-mirror">
-                        (我是 AI 助理)
-                    </div>
-                </div>
-
-                <div class="stage-avatar-area">
-                    <img id="assistant-avatar" src="" alt="AI Avatar">
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="logic-holder">
-        <div id="current-dialogue-area"></div>
-        <canvas id="audio-visualizer" width="10" height="10"></canvas> 
-        <div id="user-text-mirror"></div>
-        <audio id="tts-audio"></audio>
     </div>
 
     <script>
-        /* --- 核心運作邏輯 (不變) --- */
-        const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
-        let currentState = STATE.IDLE;
-        let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode;
-        let audioChunks = [], capturedImageBlobs = [], captureInterval;
-        let CURRENT_BASE_URL = null;
-        let ignoreClicksUntil = 0;
+        // ------------------------------------------------------------------------------------------------
+        // 全局設定
+        // ------------------------------------------------------------------------------------------------
+        const CURRENT_BASE_URL = 'https://attractions-trailers-diamond-baskets.trycloudflare.com'; // <--- 請替換為您的 Cloudflare Tunnel 網址
+        const API_PROCESS_ENDPOINT = '/api/v1/process';
+        const VIDEO_STREAM_ENABLED = true; // 是否啟用臉部情緒辨識的攝影機功能
+        let audioStream = null;
+        let mediaRecorder = null;
+        let chunks = [];
+        let isRecording = false;
 
-        const VOICE_THRESHOLD = 5;      
-        const SILENCE_TIMEOUT = 2.5;     
-        const FRAME_RATE = 0.5;
+        const STATE = {
+            INIT: 'init',
+            IDLE: 'idle',
+            RECORDING: 'recording',
+            PROCESSING: 'processing'
+        };
 
-        async function manualConnect() {
-            const url = document.getElementById('tunnel-url').value.trim();
-            if(!url) return alert("請輸入網址");
-            try {
-                const testImg = new Image();
-                testImg.src = `${url}/static/image/humorous.png`;
-                testImg.onload = () => {
-                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
-                    document.getElementById('record-button').disabled = false;
-                    document.getElementById('record-text').textContent = "點擊開始對話";
-                    loadAvatar('humorous'); 
-                    initMedia();
-                };
-                testImg.onerror = () => alert("連線失敗");
-            } catch(e) { alert("錯誤: " + e.message); }
-        }
+        // ------------------------------------------------------------------------------------------------
+        // 輔助函式
+        // ------------------------------------------------------------------------------------------------
 
-        async function initMedia() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-                audioStream = stream;
-                document.getElementById('video-stream').srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
-                setupAudioVisualizer(stream);
-            } catch(e) { console.error(e); alert("無法取得權限"); }
-        }
-
-        function setupAudioVisualizer(stream) {
-            if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioContext.createMediaStreamSource(stream);
-            analyserNode = audioContext.createAnalyser();
-            analyserNode.fftSize = 512;
-            source.connect(analyserNode);
-            drawVisualizer();
-        }
-
-        function drawVisualizer() {
-            const canvas = document.getElementById('audio-visualizer');
-            const ctx = canvas.getContext('2d');
-            const bufferLength = analyserNode.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-            const draw = () => {
-                requestAnimationFrame(draw);
-                analyserNode.getByteFrequencyData(dataArray);
-                let sum = 0; for(let i=0; i<bufferLength; i++) sum += dataArray[i];
-                if(currentState === STATE.RECORDING && (sum/bufferLength) > VOICE_THRESHOLD) lastSpeechTime = Date.now();
-            };
-            draw();
-        }
-
-        let lastSpeechTime = 0;
-        let silenceTimer = null;
-        function toggleRecording() {
-            if(Date.now() < ignoreClicksUntil) return;
-            if(currentState === STATE.IDLE) startRecording();
-            else if(currentState === STATE.RECORDING) stopRecording();
-        }
-
-        function updateBtnState(state) {
-            currentState = state;
+        /**
+         * 根據狀態更新按鈕、輸入框和 UI 視覺
+         * @param {string} newState - 新的狀態 (INIT, IDLE, RECORDING, PROCESSING)
+         */
+        function updateBtnState(newState) {
             const btn = document.getElementById('record-button');
-            const txt = document.getElementById('record-text');
-            if(state === STATE.IDLE) {
-                btn.className = 'btn-idle'; txt.textContent = "點擊開始對話"; btn.disabled = false;
-            } else if(state === STATE.RECORDING) {
-                btn.className = 'btn-recording'; txt.textContent = "聆聽中..."; btn.disabled = false;
-            } else if(state === STATE.PROCESSING) {
-                btn.className = 'btn-processing'; txt.textContent = "AI 思考中..."; btn.disabled = true;
+            const input = document.getElementById('text-input');
+            const submitBtn = document.getElementById('text-submit-btn');
+            const micStatus = document.getElementById('mic-status');
+
+            btn.disabled = false;
+            input.disabled = true;
+            submitBtn.disabled = true;
+
+            switch (newState) {
+                case STATE.INIT:
+                    btn.textContent = "等待連線中...";
+                    btn.className = 'record-button btn-idle';
+                    btn.disabled = true;
+                    micStatus.textContent = "等待連線中...";
+                    break;
+                case STATE.IDLE:
+                    // 檢查按鈕是否被「啟用音訊」的提示佔用
+                    if (!btn.textContent.includes('啟用音訊')) {
+                        btn.textContent = "點擊開始對話";
+                        btn.className = 'record-button btn-idle';
+                    }
+                    input.disabled = false;
+                    submitBtn.disabled = false;
+                    micStatus.textContent = "點擊開始";
+                    break;
+                case STATE.RECORDING:
+                    btn.textContent = "錄音中... (點擊停止)";
+                    btn.className = 'record-button btn-recording';
+                    input.disabled = true;
+                    submitBtn.disabled = true;
+                    micStatus.textContent = "正在錄音...";
+                    break;
+                case STATE.PROCESSING:
+                    btn.textContent = "處理中...";
+                    btn.className = 'record-button btn-processing';
+                    btn.disabled = true;
+                    input.disabled = true;
+                    submitBtn.disabled = true;
+                    micStatus.textContent = "處理中...";
+                    break;
             }
         }
 
-        function startRecording() {
-            updateBtnState(STATE.RECORDING);
-            audioChunks = []; capturedImageBlobs = [];
-            mediaRecorder = new MediaRecorder(audioStream);
-            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-            mediaRecorder.onstop = uploadData;
-            mediaRecorder.start();
-            captureInterval = setInterval(() => {
-                if(!videoTrack) return;
-                const cvs = document.createElement('canvas');
-                cvs.width = 640; cvs.height = 480;
-                cvs.getContext('2d').drawImage(document.getElementById('video-stream'), 0, 0);
-                cvs.toBlob(b => capturedImageBlobs.push(b), 'image/jpeg', 0.8);
-            }, 1000/FRAME_RATE);
-            lastSpeechTime = Date.now();
-            ignoreClicksUntil = Date.now() + 1000;
-            silenceTimer = setInterval(() => {
-                if(Date.now() - lastSpeechTime > SILENCE_TIMEOUT * 1000) {
-                    if(Date.now() > ignoreClicksUntil) stopRecording(); 
+        /**
+         * 處理麥克風音量視覺化
+         */
+        function handleMicLevel(stream) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = audioContext.createAnalyser();
+            const microphone = audioContext.createMediaStreamSource(stream);
+            const micLevelBar = document.getElementById('mic-level');
+
+            analyser.fftSize = 256;
+            microphone.connect(analyser);
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function update() {
+                requestAnimationFrame(update);
+                analyser.getByteFrequencyData(dataArray);
+
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
                 }
-            }, 500);
+                const average = sum / bufferLength;
+                const percent = Math.min(100, Math.floor(average * 100 / 128)); // 調整最大音量 (128 是最大值的一半，視覺效果較好)
+                
+                micLevelBar.style.width = `${percent}%`;
+            }
+            update();
         }
 
-        function stopRecording() {
-            if(currentState !== STATE.RECORDING) return;
-            clearInterval(captureInterval); clearInterval(silenceTimer);
-            mediaRecorder.stop();
-            updateBtnState(STATE.PROCESSING);
-        }
+        /**
+         * 獲取麥克風和攝影機權限並初始化 MediaRecorder
+         */
+        async function initMedia() {
+            updateBtnState(STATE.INIT);
+            document.getElementById('server-url-display').textContent = CURRENT_BASE_URL;
 
-        async function uploadData() {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            if(audioBlob.size < 1000) { updateBtnState(STATE.IDLE); return; }
-            const fd = new FormData();
-            fd.append('audio_file', audioBlob);
-            capturedImageBlobs.forEach((b, i) => fd.append(`image_${i}`, b, `frame_${i}.jpg`));
-            fd.append('turn_data', JSON.stringify({ session_id: 'demo_01', history: [] }));
             try {
-                const res = await fetch(`${CURRENT_BASE_URL}/api/v1/process`, { method: 'POST', body: fd });
-                handleResult(await res.json());
-            } catch(e) { alert("上傳失敗"); updateBtnState(STATE.IDLE); }
-        }
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: VIDEO_STREAM_ENABLED });
+                audioStream = stream;
 
-        function handleResult(data) {
-            const chatArea = document.getElementById('current-dialogue-area');
-            chatArea.innerHTML = `
-                <div class="bubble user-bubble">${data.user_text || "..."}</div>
-                <div class="bubble bot-bubble">${data.reply || "..."}</div>
-            `;
-            
-            const mapE = { "comforting": "🤗 安撫", "cheerful": "😄 開朗", "humorous": "😆 幽默", "gentle": "💝 溫柔", "rational": "🤔 理性", "encouraging": "💪 鼓勵" };
-            const pName = mapE[data.personality] || data.personality;
-            document.getElementById('personality-display').textContent = pName;
-            document.getElementById('personality-mode-tag').textContent = data.new_manual_personality ? "(手動)" : "(自動)";
+                // 處理麥克風音量視覺化
+                handleMicLevel(stream);
+                
+                // 處理攝影機預覽
+                if (VIDEO_STREAM_ENABLED) {
+                    const video = document.getElementById('webcam-video');
+                    video.srcObject = stream;
+                    document.getElementById('camera-container').style.display = 'block';
+                }
 
-            if(data.emotion_results) {
-                if(data.emotion_results.text) document.getElementById('text-emotion-display').textContent = `${data.emotion_results.text.emotion} ${(data.emotion_results.text.score*100).toFixed(0)}%`;
-                if(data.emotion_results.audio) document.getElementById('audio-emotion-display').textContent = `${data.emotion_results.audio.emotion} ${(data.emotion_results.audio.score*100).toFixed(0)}%`;
-                if(data.emotion_results.facial) document.getElementById('facial-emotion-display').textContent = `${data.emotion_results.facial.emotion} ${(data.emotion_results.facial.confidence*100).toFixed(0)}%`;
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                mediaRecorder.ondataavailable = (e) => {
+                    chunks.push(e.data);
+                };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    chunks = [];
+                    sendAudio(blob);
+                };
+
+                // 更新連線狀態和按鈕狀態
+                document.getElementById('connection-status').classList.add('connected');
+                updateBtnState(STATE.IDLE);
+                console.log("✅ 媒體初始化成功");
+            } catch (err) {
+                console.error("❌ 無法取得麥克風/攝影機權限:", err);
+                document.getElementById('mic-status').textContent = "權限拒絕/錯誤";
+                alert("無法取得麥克風或攝影機權限。請檢查瀏覽器設定。");
+                updateBtnState(STATE.INIT);
             }
-
-            if(data.calculation_logs) {
-                document.getElementById('calc-display-area').textContent = data.calculation_logs.join('\n');
-            }
-
-            loadAvatar(data.personality);
-            if(data.tts_audio_file) playAudio(data.tts_audio_file);
-            else updateBtnState(STATE.IDLE);
         }
 
-        function loadAvatar(personality) {
-            document.getElementById('assistant-avatar').src = `${CURRENT_BASE_URL}/static/image/${personality || 'humorous'}.png`;
-        }
-
+        /**
+         * 播放 TTS 音訊 (重要：新增錯誤處理，解決權限問題)
+         * @param {string} filename - 要下載的音訊檔名
+         */
         function playAudio(filename) {
             const audio = document.getElementById('tts-audio');
             const avatar = document.getElementById('assistant-avatar');
-            audio.src = `${CURRENT_BASE_URL}/api/v1/audio-download?filename=${filename}`;
-            audio.onplay = () => avatar.classList.add('speaking');
-            audio.onended = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
-            audio.onerror = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
-            audio.play();
-        }
-    </script>
-
-    <script>
-        const dialogueObserver = new MutationObserver((mutations) => {
-            const source = document.getElementById('current-dialogue-area');
-            const userBubble = source.querySelector('.user-bubble');
-            const botBubble = source.querySelector('.bot-bubble');
             
-            const stageUserBubble = document.getElementById('stage-user-bubble');
-            const stageAiBubble = document.getElementById('stage-ai-bubble');
+            // 設置音訊來源
+            audio.src = `${CURRENT_BASE_URL}/api/v1/audio-download?filename=${filename}`;
+            
+            // 設置事件處理器
+            audio.onplay = () => avatar.classList.add('speaking');
+            audio.onended = () => { 
+                avatar.classList.remove('speaking'); 
+                updateBtnState(STATE.IDLE); // 播放結束，回到 IDLE
+            };
+            
+            // 錯誤處理 (如果檔案載入失敗或有其他問題)
+            audio.onerror = (e) => { 
+                console.error("Audio playback error:", e);
+                avatar.classList.remove('speaking'); 
+                updateBtnState(STATE.IDLE); 
+                alert("⚠️ 音訊檔案載入或播放失敗。請嘗試在錄音前點擊畫面上的按鈕啟用音訊。");
+            };
+            
+            // 嘗試播放，並處理瀏覽器自動播放的限制 (Autoplay Policy)
+            const playPromise = audio.play();
 
-            if(userBubble) {
-                stageUserBubble.textContent = userBubble.textContent;
-                stageUserBubble.classList.add('bubble-show');
+            if (playPromise !== undefined) {
+                playPromise.then(_ => {
+                    // 播放成功
+                    console.log("✅ 音訊播放成功");
+                }).catch(error => {
+                    // 播放被阻擋 (常見的 Autoplay 政策限制)
+                    console.error("瀏覽器阻止音訊自動播放", error);
+                    avatar.classList.remove('speaking'); 
+                    updateBtnState(STATE.IDLE);
+                    
+                    // 提示用戶手動介入
+                    alert("⚠️ 瀏覽器阻止了音訊自動播放。請在下次點擊錄音前，嘗試點擊畫面上的任何按鈕以啟動音訊。");
+                    
+                    // 將錄音按鈕改為提示狀態，引導用戶進行一次點擊互動
+                    const btn = document.getElementById('record-button');
+                    if (btn.className !== 'btn-processing') {
+                         btn.textContent = "🔊 點此啟用音訊 (點擊後請再點擊開始對話)";
+                         btn.className = 'record-button btn-idle'; // 改回 idle 狀態但用特定文字提示
+                         btn.disabled = false;
+                    }
+                });
             }
-            if(botBubble) {
-                stageAiBubble.textContent = botBubble.textContent;
-                stageAiBubble.classList.add('bubble-show');
+        }
+
+
+        /**
+         * 新增訊息到聊天紀錄
+         * @param {string} sender - 'user' or 'assistant'
+         * @param {string} content - 訊息內容
+         * @param {Object} [data] - 來自伺服器的額外數據 (情緒、人格、日誌)
+         */
+        function addMessage(sender, content, data = {}) {
+            const chatHistory = document.getElementById('chat-history');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}-message`;
+            msgDiv.innerHTML = `<p>${content}</p>`;
+
+            if (sender === 'assistant') {
+                const personality = data.personality || 'Unknown';
+                const trend = data.trend || 'stable';
+
+                msgDiv.innerHTML += `<small id="current-personality">目前人格：${data.personality_zh} (${personality})</small>`;
+                
+                // 新增日誌顯示
+                if (data.calc_logs) {
+                    const logsDiv = document.createElement('div');
+                    logsDiv.className = 'logs';
+                    logsDiv.textContent = data.calc_logs.join('\n');
+                    msgDiv.appendChild(logsDiv);
+                }
+                document.getElementById('emotion-badge').textContent = `${data.dominant_emotion_zh || '待命中'} (${data.personality_zh})`;
+                document.getElementById('assistant-avatar').src = `static/image/${personality.toLowerCase()}.png`;
             }
+
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight; // 滾動到底部
+        }
+
+
+        /**
+         * 清空情緒面板顯示
+         */
+        function clearEmotionDisplay() {
+            document.getElementById('text-emotion-output').textContent = '--';
+            document.getElementById('audio-emotion-output').textContent = '--';
+            document.getElementById('facial-emotion-output').textContent = '--';
+            
+            // 隱藏的數據來源也要清空
+            document.getElementById('text-emotion-display').textContent = '--';
+            document.getElementById('audio-emotion-display').textContent = '--';
+            document.getElementById('facial-emotion-display').textContent = '--';
+
+            // 重置人格徽章
+            document.getElementById('emotion-badge').textContent = `待命中 (Humorous)`;
+            document.getElementById('assistant-avatar').src = `static/image/humorous.png`;
+        }
+
+        /**
+         * 更新情緒面板顯示
+         */
+        function updateEmotionDisplay(emotions) {
+            const text = emotions.text || { dominant: '--', percent: '0%', raw: '--' };
+            const audio = emotions.audio || { dominant: '--', percent: '0%', raw: '--' };
+            const facial = emotions.facial || { dominant: '--', percent: '0%', raw: '--' };
+            
+            document.getElementById('text-emotion-output').textContent = text.raw;
+            document.getElementById('audio-emotion-output').textContent = audio.raw;
+            document.getElementById('facial-emotion-output').textContent = facial.raw;
+            
+            // 隱藏的數據來源 (用於同步視覺化)
+            document.getElementById('text-emotion-display').textContent = `${text.dominant} ${text.percent.replace('%', '')}%`;
+            document.getElementById('audio-emotion-display').textContent = `${audio.dominant} ${audio.percent.replace('%', '')}%`;
+            document.getElementById('facial-emotion-display').textContent = `${facial.dominant} ${facial.percent.replace('%', '')}%`;
+        }
+
+
+        /**
+         * 將音訊發送到伺服器進行處理
+         * @param {Blob} audioBlob - 錄製的音訊 Blob
+         */
+        async function sendAudio(audioBlob) {
+            if (audioBlob.size === 0) {
+                 console.warn("⚠️ 錄音檔案大小為零，取消發送。");
+                 updateBtnState(STATE.IDLE);
+                 return;
+            }
+
+            updateBtnState(STATE.PROCESSING);
+            document.getElementById('loading-indicator').style.display = 'block';
+            clearEmotionDisplay();
+
+            const formData = new FormData();
+            formData.append('audio_file', audioBlob, 'uploaded_blob');
+            formData.append('turn_data', JSON.stringify({
+                type: 'audio',
+                // 未來的數據可以放在這裡
+            }));
+
+            try {
+                const response = await fetch(CURRENT_BASE_URL + API_PROCESS_ENDPOINT, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                document.getElementById('loading-indicator').style.display = 'none';
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // 1. 顯示用戶訊息
+                    addMessage('user', data.stt_result);
+
+                    // 2. 更新情緒面板
+                    updateEmotionDisplay(data.emotion_data);
+                    
+                    // 3. 顯示助理回應
+                    addMessage('assistant', data.reply_text, data);
+
+                    // 4. 播放 TTS 音訊 (重要：這裡呼叫了 playAudio)
+                    if (data.tts_filename) {
+                        playAudio(data.tts_filename);
+                    } else {
+                        // 如果沒有 TTS 檔案，直接回到 IDLE
+                        updateBtnState(STATE.IDLE);
+                    }
+
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(`伺服器錯誤: ${errorData.error}`);
+                }
+
+            } catch (error) {
+                console.error("❌ 網路請求或處理失敗:", error);
+                document.getElementById('loading-indicator').style.display = 'none';
+                updateBtnState(STATE.IDLE);
+                alert(`連線或處理發生錯誤: ${error.message}`);
+                clearEmotionDisplay();
+            }
+        }
+
+
+        /**
+         * 發送文字到伺服器進行處理
+         * @param {string} text - 文字輸入
+         */
+        async function sendText(text) {
+             if (text.trim() === "") return;
+
+            updateBtnState(STATE.PROCESSING);
+            document.getElementById('loading-indicator').style.display = 'block';
+            clearEmotionDisplay();
+
+            const formData = new FormData();
+            formData.append('audio_file', new Blob([""], { type: 'audio/webm' }), 'dummy_blob'); // 傳送空音訊檔
+            formData.append('turn_data', JSON.stringify({
+                type: 'text',
+                text_input: text
+            }));
+            
+            document.getElementById('text-input').value = '';
+
+            try {
+                const response = await fetch(CURRENT_BASE_URL + API_PROCESS_ENDPOINT, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                document.getElementById('loading-indicator').style.display = 'none';
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // 1. 顯示用戶訊息
+                    addMessage('user', text);
+
+                    // 2. 更新情緒面板 (文字模式下，語音和臉部數據為空)
+                    updateEmotionDisplay(data.emotion_data);
+                    
+                    // 3. 顯示助理回應
+                    addMessage('assistant', data.reply_text, data);
+
+                    // 4. 播放 TTS 音訊 (重要：這裡呼叫了 playAudio)
+                    if (data.tts_filename) {
+                        playAudio(data.tts_filename);
+                    } else {
+                        // 如果沒有 TTS 檔案，直接回到 IDLE
+                        updateBtnState(STATE.IDLE);
+                    }
+
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(`伺服器錯誤: ${errorData.error}`);
+                }
+
+            } catch (error) {
+                console.error("❌ 網路請求或處理失敗:", error);
+                document.getElementById('loading-indicator').style.display = 'none';
+                updateBtnState(STATE.IDLE);
+                alert(`連線或處理發生錯誤: ${error.message}`);
+                clearEmotionDisplay();
+            }
+        }
+
+
+        // ------------------------------------------------------------------------------------------------
+        // 事件監聽與主程序
+        // ------------------------------------------------------------------------------------------------
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initMedia(); // 啟動時請求麥克風/攝影機權限
+
+            const recordButton = document.getElementById('record-button');
+            const resetButton = document.getElementById('reset-button');
+            const textInput = document.getElementById('text-input');
+            const textSubmitBtn = document.getElementById('text-submit-btn');
+
+            // 錄音按鈕事件
+            recordButton.addEventListener('click', () => {
+                // 檢查是否處於啟用音訊提示狀態，如果是，執行一次空操作來啟用播放權限
+                 if (recordButton.textContent.includes('啟用音訊')) {
+                    recordButton.textContent = "點擊開始對話";
+                    recordButton.className = 'record-button btn-idle';
+                    return; // 執行一次點擊來啟用權限，然後結束
+                }
+                
+                if (recordButton.className.includes('btn-idle')) {
+                    // 開始錄音
+                    chunks = [];
+                    mediaRecorder.start();
+                    isRecording = true;
+                    updateBtnState(STATE.RECORDING);
+                    console.log("🎤 開始錄音...");
+                } else if (recordButton.className.includes('btn-recording')) {
+                    // 停止錄音
+                    if (mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                    }
+                    updateBtnState(STATE.PROCESSING); // 在 mediaRecorder.onstop 完成後會轉到 IDLE
+                    console.log("⏸️ 錄音停止，等待處理...");
+                }
+            });
+
+            // 重置人格按鈕事件
+            resetButton.addEventListener('click', () => {
+                sendText('重置人格');
+            });
+            
+            // 文字輸入事件
+            textSubmitBtn.addEventListener('click', () => {
+                sendText(textInput.value);
+            });
+            textInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !textInput.disabled) {
+                    e.preventDefault();
+                    sendText(textInput.value);
+                }
+            });
         });
-        dialogueObserver.observe(document.getElementById('current-dialogue-area'), { childList: true, subtree: true });
-
+        
+        
+        // ------------------------------------------------------------------------------------------------
+        // 情緒視覺化同步 (使用 MutationObserver 監聽隱藏元素變化)
+        // ------------------------------------------------------------------------------------------------
         function syncProgressBar(sourceId, barId, labelId, valId) {
             const source = document.getElementById(sourceId);
             const observer = new MutationObserver(() => {
                 const fullText = source.textContent; 
+                // 預期的格式如: "neutral 75%" 或 "sad 90%"
                 const match = fullText.match(/^([a-zA-Z]+)\s+(\d+)%$/);
                 
                 if (match) {
