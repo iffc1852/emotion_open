@@ -312,221 +312,266 @@
         <audio id="tts-audio"></audio>
     </div>
 
-    <script>
-        /* --- 核心運作邏輯 (不變) --- */
-        const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
-        let currentState = STATE.IDLE;
-        let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode;
-        let audioChunks = [], capturedImageBlobs = [], captureInterval;
-        let CURRENT_BASE_URL = null;
-        let ignoreClicksUntil = 0;
+<script>
+    /* --- 核心運作邏輯 (不變) --- */
+    const STATE = { IDLE: 'IDLE', RECORDING: 'RECORDING', PROCESSING: 'PROCESSING' };
+    let currentState = STATE.IDLE;
+    let mediaRecorder, audioStream, videoTrack, audioContext, analyserNode;
+    let audioChunks = [], capturedImageBlobs = [], captureInterval;
+    let CURRENT_BASE_URL = null;
+    let ignoreClicksUntil = 0;
 
-        const VOICE_THRESHOLD = 5;      
-        const SILENCE_TIMEOUT = 2.5;     
-        const FRAME_RATE = 0.5;
+    const VOICE_THRESHOLD = 5;      
+    const SILENCE_TIMEOUT = 2.5;     
+    const FRAME_RATE = 0.5;
 
-        async function manualConnect() {
-            const url = document.getElementById('tunnel-url').value.trim();
-            if(!url) return alert("請輸入網址");
-            try {
-                const testImg = new Image();
-                testImg.src = `${url}/static/image/humorous.png`;
-                testImg.onload = () => {
-                    CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
-                    document.getElementById('record-button').disabled = false;
-                    document.getElementById('record-text').textContent = "點擊開始對話";
-                    loadAvatar('humorous'); 
-                    initMedia();
-                };
-                testImg.onerror = () => alert("連線失敗");
-            } catch(e) { alert("錯誤: " + e.message); }
-        }
-
-        async function initMedia() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-                audioStream = stream;
-                document.getElementById('video-stream').srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
-                setupAudioVisualizer(stream);
-            } catch(e) { console.error(e); alert("無法取得權限"); }
-        }
-
-        function setupAudioVisualizer(stream) {
-            if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioContext.createMediaStreamSource(stream);
-            analyserNode = audioContext.createAnalyser();
-            analyserNode.fftSize = 512;
-            source.connect(analyserNode);
-            drawVisualizer();
-        }
-
-        function drawVisualizer() {
-            const canvas = document.getElementById('audio-visualizer');
-            const ctx = canvas.getContext('2d');
-            const bufferLength = analyserNode.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-            const draw = () => {
-                requestAnimationFrame(draw);
-                analyserNode.getByteFrequencyData(dataArray);
-                let sum = 0; for(let i=0; i<bufferLength; i++) sum += dataArray[i];
-                if(currentState === STATE.RECORDING && (sum/bufferLength) > VOICE_THRESHOLD) lastSpeechTime = Date.now();
+    async function manualConnect() {
+        const url = document.getElementById('tunnel-url').value.trim();
+        if(!url) return alert("請輸入網址");
+        try {
+            const testImg = new Image();
+            testImg.src = `${url}/static/image/humorous.png`;
+            testImg.onload = () => {
+                CURRENT_BASE_URL = url.endsWith('/') ? url.slice(0, -1) : url;
+                document.getElementById('record-button').disabled = false;
+                document.getElementById('record-text').textContent = "點擊開始對話";
+                loadAvatar('humorous'); 
+                initMedia();
             };
-            draw();
+            testImg.onerror = () => alert("連線失敗");
+        } catch(e) { alert("錯誤: " + e.message); }
+    }
+
+    async function initMedia() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            audioStream = stream;
+            document.getElementById('video-stream').srcObject = stream;
+            videoTrack = stream.getVideoTracks()[0];
+            setupAudioVisualizer(stream);
+        } catch(e) { console.error(e); alert("無法取得權限"); }
+    }
+
+    function setupAudioVisualizer(stream) {
+        if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 512;
+        source.connect(analyserNode);
+        drawVisualizer();
+    }
+
+    function drawVisualizer() {
+        const canvas = document.getElementById('audio-visualizer');
+        const ctx = canvas.getContext('2d');
+        const bufferLength = analyserNode.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        const draw = () => {
+            requestAnimationFrame(draw);
+            analyserNode.getByteFrequencyData(dataArray);
+            let sum = 0; for(let i=0; i<bufferLength; i++) sum += dataArray[i];
+            if(currentState === STATE.RECORDING && (sum/bufferLength) > VOICE_THRESHOLD) lastSpeechTime = Date.now();
+        };
+        draw();
+    }
+
+    let lastSpeechTime = 0;
+    let silenceTimer = null;
+    function toggleRecording() {
+        if(Date.now() < ignoreClicksUntil) return;
+        
+        // 【修正】檢查是否處於啟用音訊提示狀態，如果是，執行一次空操作來啟用播放權限
+        const btn = document.getElementById('record-button');
+        const txt = document.getElementById('record-text');
+        
+        if (txt.textContent.includes('啟用音訊')) {
+            // 用戶點擊了「啟用音訊」按鈕
+            txt.textContent = "點擊開始對話";
+            btn.className = 'btn-idle';
+            return; // 執行一次點擊來啟用權限，然後結束
         }
 
-        let lastSpeechTime = 0;
-        let silenceTimer = null;
-        function toggleRecording() {
-            if(Date.now() < ignoreClicksUntil) return;
-            if(currentState === STATE.IDLE) startRecording();
-            else if(currentState === STATE.RECORDING) stopRecording();
-        }
+        if(currentState === STATE.IDLE) startRecording();
+        else if(currentState === STATE.RECORDING) stopRecording();
+    }
 
-        function updateBtnState(state) {
-            currentState = state;
-            const btn = document.getElementById('record-button');
-            const txt = document.getElementById('record-text');
-            if(state === STATE.IDLE) {
-                btn.className = 'btn-idle'; txt.textContent = "點擊開始對話"; btn.disabled = false;
-            } else if(state === STATE.RECORDING) {
-                btn.className = 'btn-recording'; txt.textContent = "聆聽中..."; btn.disabled = false;
-            } else if(state === STATE.PROCESSING) {
-                btn.className = 'btn-processing'; txt.textContent = "AI 思考中..."; btn.disabled = true;
+    function updateBtnState(state) {
+        currentState = state;
+        const btn = document.getElementById('record-button');
+        const txt = document.getElementById('record-text');
+        if(state === STATE.IDLE) {
+            btn.className = 'btn-idle'; txt.textContent = "點擊開始對話"; btn.disabled = false;
+        } else if(state === STATE.RECORDING) {
+            btn.className = 'btn-recording'; txt.textContent = "聆聽中..."; btn.disabled = false;
+        } else if(state === STATE.PROCESSING) {
+            btn.className = 'btn-processing'; txt.textContent = "AI 思考中..."; btn.disabled = true;
+        }
+    }
+
+    function startRecording() {
+        updateBtnState(STATE.RECORDING);
+        audioChunks = []; capturedImageBlobs = [];
+        mediaRecorder = new MediaRecorder(audioStream);
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = uploadData;
+        mediaRecorder.start();
+        captureInterval = setInterval(() => {
+            if(!videoTrack) return;
+            const cvs = document.createElement('canvas');
+            cvs.width = 640; cvs.height = 480;
+            cvs.getContext('2d').drawImage(document.getElementById('video-stream'), 0, 0);
+            cvs.toBlob(b => capturedImageBlobs.push(b), 'image/jpeg', 0.8);
+        }, 1000/FRAME_RATE);
+        lastSpeechTime = Date.now();
+        ignoreClicksUntil = Date.now() + 1000;
+        silenceTimer = setInterval(() => {
+            if(Date.now() - lastSpeechTime > SILENCE_TIMEOUT * 1000) {
+                if(Date.now() > ignoreClicksUntil) stopRecording(); 
             }
+        }, 500);
+    }
+
+    function stopRecording() {
+        if(currentState !== STATE.RECORDING) return;
+        clearInterval(captureInterval); clearInterval(silenceTimer);
+        mediaRecorder.stop();
+        updateBtnState(STATE.PROCESSING);
+    }
+
+    async function uploadData() {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        if(audioBlob.size < 1000) { updateBtnState(STATE.IDLE); return; }
+        const fd = new FormData();
+        fd.append('audio_file', audioBlob);
+        capturedImageBlobs.forEach((b, i) => fd.append(`image_${i}`, b, `frame_${i}.jpg`));
+        fd.append('turn_data', JSON.stringify({ session_id: 'demo_01', history: [] }));
+        try {
+            const res = await fetch(`${CURRENT_BASE_URL}/api/v1/process`, { method: 'POST', body: fd });
+            handleResult(await res.json());
+        } catch(e) { alert("上傳失敗"); updateBtnState(STATE.IDLE); }
+    }
+
+    function handleResult(data) {
+        const chatArea = document.getElementById('current-dialogue-area');
+        chatArea.innerHTML = `
+            <div class="bubble user-bubble">${data.user_text || "..."}</div>
+            <div class="bubble bot-bubble">${data.reply || "..."}</div>
+        `;
+        
+        const mapE = { "comforting": "🤗 安撫", "cheerful": "😄 開朗", "humorous": "😆 幽默", "gentle": "💝 溫柔", "rational": "🤔 理性", "encouraging": "💪 鼓勵" };
+        const pName = mapE[data.personality] || data.personality;
+        document.getElementById('personality-display').textContent = pName;
+        document.getElementById('personality-mode-tag').textContent = data.new_manual_personality ? "(手動)" : "(自動)";
+
+        if(data.emotion_results) {
+            if(data.emotion_results.text) document.getElementById('text-emotion-display').textContent = `${data.emotion_results.text.emotion} ${(data.emotion_results.text.score*100).toFixed(0)}%`;
+            if(data.emotion_results.audio) document.getElementById('audio-emotion-display').textContent = `${data.emotion_results.audio.emotion} ${(data.emotion_results.audio.score*100).toFixed(0)}%`;
+            if(data.emotion_results.facial) document.getElementById('facial-emotion-display').textContent = `${data.emotion_results.facial.emotion} ${(data.emotion_results.facial.confidence*100).toFixed(0)}%`;
         }
 
-        function startRecording() {
-            updateBtnState(STATE.RECORDING);
-            audioChunks = []; capturedImageBlobs = [];
-            mediaRecorder = new MediaRecorder(audioStream);
-            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-            mediaRecorder.onstop = uploadData;
-            mediaRecorder.start();
-            captureInterval = setInterval(() => {
-                if(!videoTrack) return;
-                const cvs = document.createElement('canvas');
-                cvs.width = 640; cvs.height = 480;
-                cvs.getContext('2d').drawImage(document.getElementById('video-stream'), 0, 0);
-                cvs.toBlob(b => capturedImageBlobs.push(b), 'image/jpeg', 0.8);
-            }, 1000/FRAME_RATE);
-            lastSpeechTime = Date.now();
-            ignoreClicksUntil = Date.now() + 1000;
-            silenceTimer = setInterval(() => {
-                if(Date.now() - lastSpeechTime > SILENCE_TIMEOUT * 1000) {
-                    if(Date.now() > ignoreClicksUntil) stopRecording(); 
+        if(data.calculation_logs) {
+            document.getElementById('calc-display-area').textContent = data.calculation_logs.join('\n');
+        }
+
+        loadAvatar(data.personality);
+        if(data.tts_audio_file) playAudio(data.tts_audio_file);
+        else updateBtnState(STATE.IDLE);
+    }
+
+    function loadAvatar(personality) {
+        document.getElementById('assistant-avatar').src = `${CURRENT_BASE_URL}/static/image/${personality || 'humorous'}.png`;
+    }
+
+    function playAudio(filename) {
+        const audio = document.getElementById('tts-audio');
+        const avatar = document.getElementById('assistant-avatar');
+        
+        audio.src = `${CURRENT_BASE_URL}/api/v1/audio-download?filename=${filename}`;
+        
+        // 設置事件處理器
+        audio.onplay = () => avatar.classList.add('speaking');
+        audio.onended = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
+        audio.onerror = () => { 
+             avatar.classList.remove('speaking'); 
+             updateBtnState(STATE.IDLE);
+             alert("⚠️ 音訊檔案載入失敗。");
+        };
+        
+        // 【修正】嘗試播放，並處理瀏覽器自動播放的限制 (Autoplay Policy)
+        const playPromise = audio.play();
+
+        if (playPromise !== undefined) {
+            playPromise.then(_ => {
+                // 播放成功
+            }).catch(error => {
+                // 播放被阻擋
+                console.error("瀏覽器阻止音訊自動播放", error);
+                avatar.classList.remove('speaking'); 
+                
+                // 提示用戶手動介入
+                const btn = document.getElementById('record-button');
+                const txt = document.getElementById('record-text');
+                
+                // 避免在處理中時覆蓋，確保在 IDLE 狀態提示
+                if (currentState !== STATE.PROCESSING) {
+                    txt.textContent = "🔊 點此啟用音訊 (點擊後請再點擊開始對話)";
+                    btn.className = 'btn-processing';
+                    btn.disabled = false;
+                    updateBtnState(STATE.IDLE); // 確保狀態被更新
                 }
-            }, 500);
+                
+                alert("⚠️ 瀏覽器阻止了音訊自動播放。請點擊按鈕進行一次互動，然後再次開始對話。");
+            });
         }
+    }
+</script>
 
-        function stopRecording() {
-            if(currentState !== STATE.RECORDING) return;
-            clearInterval(captureInterval); clearInterval(silenceTimer);
-            mediaRecorder.stop();
-            updateBtnState(STATE.PROCESSING);
+<script>
+    const dialogueObserver = new MutationObserver((mutations) => {
+        const source = document.getElementById('current-dialogue-area');
+        const userBubble = source.querySelector('.user-bubble');
+        const botBubble = source.querySelector('.bot-bubble');
+        
+        const stageUserBubble = document.getElementById('stage-user-bubble');
+        const stageAiBubble = document.getElementById('stage-ai-bubble');
+
+        if(userBubble) {
+            stageUserBubble.textContent = userBubble.textContent;
+            stageUserBubble.classList.add('bubble-show');
         }
-
-        async function uploadData() {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            if(audioBlob.size < 1000) { updateBtnState(STATE.IDLE); return; }
-            const fd = new FormData();
-            fd.append('audio_file', audioBlob);
-            capturedImageBlobs.forEach((b, i) => fd.append(`image_${i}`, b, `frame_${i}.jpg`));
-            fd.append('turn_data', JSON.stringify({ session_id: 'demo_01', history: [] }));
-            try {
-                const res = await fetch(`${CURRENT_BASE_URL}/api/v1/process`, { method: 'POST', body: fd });
-                handleResult(await res.json());
-            } catch(e) { alert("上傳失敗"); updateBtnState(STATE.IDLE); }
+        if(botBubble) {
+            stageAiBubble.textContent = botBubble.textContent;
+            stageAiBubble.classList.add('bubble-show');
         }
+    });
+    dialogueObserver.observe(document.getElementById('current-dialogue-area'), { childList: true, subtree: true });
 
-        function handleResult(data) {
-            const chatArea = document.getElementById('current-dialogue-area');
-            chatArea.innerHTML = `
-                <div class="bubble user-bubble">${data.user_text || "..."}</div>
-                <div class="bubble bot-bubble">${data.reply || "..."}</div>
-            `;
+    function syncProgressBar(sourceId, barId, labelId, valId) {
+        const source = document.getElementById(sourceId);
+        const observer = new MutationObserver(() => {
+            const fullText = source.textContent; 
+            const match = fullText.match(/^([a-zA-Z]+)\s+(\d+)%$/);
             
-            const mapE = { "comforting": "🤗 安撫", "cheerful": "😄 開朗", "humorous": "😆 幽默", "gentle": "💝 溫柔", "rational": "🤔 理性", "encouraging": "💪 鼓勵" };
-            const pName = mapE[data.personality] || data.personality;
-            document.getElementById('personality-display').textContent = pName;
-            document.getElementById('personality-mode-tag').textContent = data.new_manual_personality ? "(手動)" : "(自動)";
-
-            if(data.emotion_results) {
-                if(data.emotion_results.text) document.getElementById('text-emotion-display').textContent = `${data.emotion_results.text.emotion} ${(data.emotion_results.text.score*100).toFixed(0)}%`;
-                if(data.emotion_results.audio) document.getElementById('audio-emotion-display').textContent = `${data.emotion_results.audio.emotion} ${(data.emotion_results.audio.score*100).toFixed(0)}%`;
-                if(data.emotion_results.facial) document.getElementById('facial-emotion-display').textContent = `${data.emotion_results.facial.emotion} ${(data.emotion_results.facial.confidence*100).toFixed(0)}%`;
-            }
-
-            if(data.calculation_logs) {
-                document.getElementById('calc-display-area').textContent = data.calculation_logs.join('\n');
-            }
-
-            loadAvatar(data.personality);
-            if(data.tts_audio_file) playAudio(data.tts_audio_file);
-            else updateBtnState(STATE.IDLE);
-        }
-
-        function loadAvatar(personality) {
-            document.getElementById('assistant-avatar').src = `${CURRENT_BASE_URL}/static/image/${personality || 'humorous'}.png`;
-        }
-
-        function playAudio(filename) {
-            const audio = document.getElementById('tts-audio');
-            const avatar = document.getElementById('assistant-avatar');
-            audio.src = `${CURRENT_BASE_URL}/api/v1/audio-download?filename=${filename}`;
-            audio.onplay = () => avatar.classList.add('speaking');
-            audio.onended = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
-            audio.onerror = () => { avatar.classList.remove('speaking'); updateBtnState(STATE.IDLE); };
-            audio.play();
-        }
-    </script>
-
-    <script>
-        const dialogueObserver = new MutationObserver((mutations) => {
-            const source = document.getElementById('current-dialogue-area');
-            const userBubble = source.querySelector('.user-bubble');
-            const botBubble = source.querySelector('.bot-bubble');
-            
-            const stageUserBubble = document.getElementById('stage-user-bubble');
-            const stageAiBubble = document.getElementById('stage-ai-bubble');
-
-            if(userBubble) {
-                stageUserBubble.textContent = userBubble.textContent;
-                stageUserBubble.classList.add('bubble-show');
-            }
-            if(botBubble) {
-                stageAiBubble.textContent = botBubble.textContent;
-                stageAiBubble.classList.add('bubble-show');
+            if (match) {
+                const emotionName = match[1];
+                const percent = match[2];
+                
+                document.getElementById(barId).style.width = percent + "%";
+                document.getElementById(labelId).textContent = emotionName;
+                document.getElementById(valId).textContent = percent + "%";
+            } else if (fullText.trim() === "--") {
+                 document.getElementById(labelId).textContent = "--";
+                 document.getElementById(valId).textContent = "0%";
+                 document.getElementById(barId).style.width = "0%";
             }
         });
-        dialogueObserver.observe(document.getElementById('current-dialogue-area'), { childList: true, subtree: true });
-
-        function syncProgressBar(sourceId, barId, labelId, valId) {
-            const source = document.getElementById(sourceId);
-            const observer = new MutationObserver(() => {
-                const fullText = source.textContent; 
-                const match = fullText.match(/^([a-zA-Z]+)\s+(\d+)%$/);
-                
-                if (match) {
-                    const emotionName = match[1];
-                    const percent = match[2];
-                    
-                    document.getElementById(barId).style.width = percent + "%";
-                    document.getElementById(labelId).textContent = emotionName;
-                    document.getElementById(valId).textContent = percent + "%";
-                } else if (fullText.trim() === "--") {
-                     document.getElementById(labelId).textContent = "--";
-                     document.getElementById(valId).textContent = "0%";
-                     document.getElementById(barId).style.width = "0%";
-                }
-            });
-            observer.observe(source, { childList: true, characterData: true, subtree: true });
-        }
-        
-        syncProgressBar('text-emotion-display', 'bar-text-visual', 'label-text-visual', 'val-text-visual');
-        syncProgressBar('audio-emotion-display', 'bar-audio-visual', 'label-audio-visual', 'val-audio-visual');
-        syncProgressBar('facial-emotion-display', 'bar-face-visual', 'label-face-visual', 'val-face-visual');
-    </script>
+        observer.observe(source, { childList: true, characterData: true, subtree: true });
+    }
+    
+    syncProgressBar('text-emotion-display', 'bar-text-visual', 'label-text-visual', 'val-text-visual');
+    syncProgressBar('audio-emotion-display', 'bar-audio-visual', 'label-audio-visual', 'val-audio-visual');
+    syncProgressBar('facial-emotion-display', 'bar-face-visual', 'label-face-visual', 'val-face-visual');
+</script>
 
 </body>
 </html>
