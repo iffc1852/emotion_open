@@ -1,4 +1,4 @@
-創作者使用的系統為Windows 11，不知道os系統等的安裝問題。
+創作者使用的系統為Windows 11，不知道Linux系統等的安裝問題。
 
 請下載FFmpeg並在環境變數裡面的Path加入他
 
@@ -48,4 +48,5 @@ LLM為了方便而使用線上openai的chat-4o，私下則使用glm-4-9b-chat-GG
 
 
 不具備則使用requirements-cpu.txt
+
 
